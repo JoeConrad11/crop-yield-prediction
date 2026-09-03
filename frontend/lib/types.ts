@@ -49,11 +49,43 @@ export interface YieldHistoryPoint {
   yield_bu_acre: number;
 }
 
+export interface BacktestPoint {
+  year: number;
+  actual_yield_bu_acre: number;
+  predicted_yield_bu_acre: number;
+}
+
+export interface ExplainContribution {
+  feature: string;
+  label: string;
+  value: number;
+  shap_value_bu_acre: number;
+}
+
+export interface PredictionExplanation {
+  predicted_yield_bu_acre: number;
+  base_value_bu_acre: number;
+  trend_contribution_bu_acre: number;
+  top_contributions: ExplainContribution[];
+  other_contribution_bu_acre: number;
+  other_feature_count: number;
+}
+
 export interface CountyGeoJSON {
   type: "FeatureCollection";
   features: Array<{
     type: "Feature";
     properties: { state_fips: string; county_fips: string; county_name: string };
+    geometry: { type: string; coordinates: unknown };
+  }>;
+}
+
+// Full-US backdrop -- context only, not project data (see api/scripts/build_states_geojson.py).
+export interface StateGeoJSON {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    properties: { state_fips: string; state_name: string };
     geometry: { type: string; coordinates: unknown };
   }>;
 }

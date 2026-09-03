@@ -223,6 +223,16 @@ def predict(crop: str = "corn", as_of: date = None,
     current = add_historical_comparison(current, crop)
     current.insert(0, "crop", crop)
 
+    # Snapshot of the exact feature row + trend contribution used for each
+    # county's prediction -- lets the "why this prediction" explain endpoint
+    # (api/routers/explain.py) compute real SHAP values without needing a
+    # live GEE re-fetch. Overwritten each run (latest snapshot only, no
+    # date in the filename) since the explanation only needs to match
+    # whatever's currently live in live_predictions.
+    feature_snapshot = current[["state_fips", "county_fips"] + features].copy()
+    feature_snapshot["trend_pred"] = trend_pred
+    feature_snapshot.to_csv(f"data/processed/live_features_{crop}_{checkpoint_name}.csv", index=False)
+
     # uncertainty: honest error margin (model's typical CV miss) + a coverage
     # confidence tier, so predictions aren't displayed as falsely precise
     confidence_mae = load_confidence_mae(crop, checkpoint_name)

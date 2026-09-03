@@ -4,6 +4,9 @@ supabase
 pydantic
 python-dotenv
 pandas
+scikit-learn
+joblib
+shap
 # geopandas is only needed to run scripts/build_county_geojson.py once --
 # not a runtime dependency of the API itself.
 geopandas

@@ -1,4 +1,13 @@
-import type { CountyComparison, CountyGeoJSON, CropMeta, PredictionOut, YieldHistoryPoint } from "./types";
+import type {
+  BacktestPoint,
+  CountyComparison,
+  CountyGeoJSON,
+  CropMeta,
+  PredictionExplanation,
+  PredictionOut,
+  StateGeoJSON,
+  YieldHistoryPoint,
+} from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
 
@@ -34,4 +43,22 @@ export function fetchCountyGeoJSON(state?: string): Promise<CountyGeoJSON> {
 export function fetchYieldHistory(params: { crop: string; state: string; county: string }): Promise<YieldHistoryPoint[]> {
   const qs = new URLSearchParams(params).toString();
   return getJSON<YieldHistoryPoint[]>(`/predictions/history?${qs}`);
+}
+
+export function fetchStatesGeoJSON(): Promise<StateGeoJSON> {
+  return getJSON<StateGeoJSON>("/geo/states");
+}
+
+export function fetchBacktestPredictions(
+  params: { crop: string; state: string; county: string; checkpoint?: string }
+): Promise<BacktestPoint[]> {
+  const qs = new URLSearchParams(params).toString();
+  return getJSON<BacktestPoint[]>(`/predictions/backtest?${qs}`);
+}
+
+export function fetchExplanation(
+  params: { crop: string; state: string; county: string; checkpoint?: string }
+): Promise<PredictionExplanation> {
+  const qs = new URLSearchParams(params).toString();
+  return getJSON<PredictionExplanation>(`/predictions/explain?${qs}`);
 }

@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
-from api.routers import comparisons, crops, geo, history, predictions  # noqa: E402
+from api.routers import comparisons, crops, explain, geo, history, predictions  # noqa: E402
 
 app = FastAPI(title="Crop Yield Prediction API")
 
@@ -36,6 +36,7 @@ app.include_router(predictions.router)
 app.include_router(comparisons.router)
 app.include_router(geo.router)
 app.include_router(history.router)
+app.include_router(explain.router)
 
 
 @app.get("/health")

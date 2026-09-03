@@ -12,7 +12,10 @@ export function MapLegend({
   unit: string;
   colorAt: (value: number) => string;
 }) {
-  const steps = 6;
+  // Enough steps to read as a smooth gradient rather than discrete bands --
+  // matters more now that it's a genuine two-hue gradient (gold -> green),
+  // not shades of one color.
+  const steps = 24;
   const stops = Array.from({ length: steps }, (_, i) => min + ((max - min) * i) / (steps - 1));
 
   return (

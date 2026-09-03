@@ -124,6 +124,29 @@ Live (run anytime during the season, or on a schedule via `modal_app.py`):
 3. `compare_crops.py` → `data/processed/crop_comparison_<date>.csv`
 4. `run_pipeline.py` → runs 2+3 and writes to Supabase (what the Modal cron calls)
 
+## Frontend
+
+`api/` (FastAPI, read-only, reads Supabase with the anon key) + `frontend/`
+(Next.js) serve the pipeline's output as an interactive county map. Crop
+metadata is entirely driven by `src/config.py` `CROPS` — no crop name is
+hardcoded in either layer, so adding a crop to `CROPS` (plus its upstream
+data) needs zero frontend/API changes.
+
+- `api/main.py`: `GET /crops`, `GET /predictions[/latest]`,
+  `GET /comparisons` (pivots `crop_profitability` into a per-county
+  `best_crop`/`margin_dollars` shape), `GET /predictions/history` (year-by-
+  year actual yield from `model_table_<crop>_pre_harvest.csv`, for the trend
+  chart), `GET /geo/counties` (static GeoJSON built once via
+  `api/scripts/build_county_geojson.py`).
+- `frontend/`: a choropleth map (click a county to see its yield-history +
+  prediction trend chart, with a shaded confidence band), a searchable/
+  sortable county comparison list, zoom/pan, and a design system at
+  `frontend/design-system/crop-yield-predictor/MASTER.md`.
+- Run locally: `.venv/bin/uvicorn api.main:app --port 8000` and
+  `npm run dev --prefix frontend` (needs `frontend/.env.local` with
+  `NEXT_PUBLIC_API_BASE_URL`, and `api/.env` with `SUPABASE_ANON_KEY` — see
+  the `.env.example` files). Not yet deployed anywhere; local dev only.
+
 ## Known limitations / open questions
 
 - NC's growing season runs ~3-4 weeks ahead of IA/IL/NE (earlier planting
@@ -158,7 +181,9 @@ Live (run anytime during the season, or on a schedule via `modal_app.py`):
   differ substantially from its county average. Getting to true farm-level
   precision needs field-boundary input + higher-resolution imagery
   (Sentinel-2, not MODIS) — see Project Goal above.
-- No frontend yet — pipeline output is CSV files, not a served UI.
+- Frontend (see "Frontend" above) is local-dev only — not deployed, no
+  auth, CORS open to any localhost port for dev convenience. A full mobile-
+  responsive pass and real hosting are still open.
 
 ## Data sources reference
 
