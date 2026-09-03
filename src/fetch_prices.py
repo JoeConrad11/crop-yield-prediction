@@ -10,7 +10,7 @@ import requests
 import pandas as pd
 from dotenv import load_dotenv
 
-from config import STATE_ALPHAS, CROPS
+from config import CROPS, crop_state_alphas
 
 load_dotenv()
 
@@ -29,6 +29,11 @@ def fetch_state_prices(crop: str, state_alpha: str, year: int) -> pd.DataFrame:
         "format": "JSON",
     }
     resp = requests.get(API_URL, params=params, timeout=60)
+    if resp.status_code == 400:
+        # NASS returns 400 (not an empty 200) for a genuinely empty result --
+        # same as fetch_nass.py's county-yield fetch (e.g. no wheat price
+        # reported for a state that doesn't grow enough of it).
+        return pd.DataFrame(columns=["year", "state_alpha", "reference_period_desc", "Value"])
     resp.raise_for_status()
     data = resp.json().get("data", [])
     df = pd.DataFrame(data)
@@ -55,7 +60,7 @@ if __name__ == "__main__":
     from datetime import date
     rows = []
     for crop in CROPS:
-        for state in STATE_ALPHAS:
+        for state in crop_state_alphas(crop):
             price = latest_price(crop, state, date.today().year)
             rows.append({"crop": crop, "state_alpha": state, "price_per_bu": price})
             print(f"{crop} / {state}: ${price}/bu")

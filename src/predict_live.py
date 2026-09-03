@@ -24,13 +24,13 @@ import pandas as pd
 from dotenv import load_dotenv
 import os
 
-from config import STATE_FIPS, PERIODS, CHECKPOINTS, CROPS, STATES
+from config import STATE_FIPS, PERIODS, CHECKPOINTS, CROPS, STATES, crop_state_fips
 from fetch_gee import fetch_period_ndvi
 from fetch_prism import fetch_period_weather
 from fetch_soil_moisture import fetch_period_soil_moisture
 from fetch_rotation import fetch_rotation_signal
 from build_dataset import SOIL_COLS, TERRAIN_COLS, MIN_CROP_PIXELS
-from feature_engineering import trend_predict, add_anomaly_features
+from feature_engineering import trend_predict, add_anomaly_features, best_variant
 
 from gee_auth import ensure_initialized
 ensure_initialized()
@@ -86,11 +86,12 @@ def fetch_current_weather_and_moisture(current_year: int, periods: list) -> pd.D
     return combined
 
 
-def fetch_current_ndvi(current_year: int, periods: list, cdl_code: int, cdl_year: int) -> pd.DataFrame:
+def fetch_current_ndvi(current_year: int, periods: list, cdl_code: int, cdl_year: int,
+                        state_fips_list: list = STATE_FIPS) -> pd.DataFrame:
     frames = []
     for period_name in periods:
         start_md, end_md = PERIODS[period_name]
-        frames.append(fetch_period_ndvi(STATE_FIPS, current_year, current_year,
+        frames.append(fetch_period_ndvi(state_fips_list, current_year, current_year,
                                          period_name, start_md, end_md, cdl_code, cdl_year=cdl_year))
     ndvi = pd.concat(frames, ignore_index=True)
 
@@ -112,13 +113,13 @@ def fetch_current_ndvi(current_year: int, periods: list, cdl_code: int, cdl_year
     return ndvi_wide.drop(columns=pixel_cols).reset_index(drop=True)
 
 
-def fetch_current_rotation(cdl_code: int, cdl_year: int) -> pd.DataFrame:
+def fetch_current_rotation(cdl_code: int, cdl_year: int, state_fips_list: list = STATE_FIPS) -> pd.DataFrame:
     """Rotation signal for the CURRENT season uses the same cdl_year proxy as
     the NDVI crop mask (real CDL for the current year isn't published yet):
     of the pixels classified as this crop in the proxy year, what fraction
     were also this crop the year before that. Crop-specific like NDVI, not
     shared like weather/soil."""
-    df = fetch_rotation_signal(STATE_FIPS, cdl_year, cdl_year, cdl_code)
+    df = fetch_rotation_signal(state_fips_list, cdl_year, cdl_year, cdl_code)
     df["state_fips"] = df["state_fips"].astype(str).str.zfill(2)
     df["county_fips"] = df["county_fips"].astype(str).str.zfill(3)
     return df[["state_fips", "county_fips", "pct_continuous"]]
@@ -136,14 +137,18 @@ def attach_static_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_confidence_mae(crop: str, checkpoint_name: str) -> float:
-    """Typical model error (bu/acre), from the same CV comparison that
-    validated the engineered-feature production models -- used as an honest
-    error margin so predictions aren't shown as falsely precise point
-    estimates. Not a proper prediction interval (that would need quantile
-    regression), just the model's known average miss."""
+    """Typical model error (bu/acre), from the SAME variant (engineered or
+    baseline, see feature_engineering.best_variant) actually shipped for this
+    crop/checkpoint -- used as an honest error margin so predictions aren't
+    shown as falsely precise point estimates. Not a proper prediction
+    interval (that would need quantile regression), just the model's known
+    average miss. Was previously hardcoded to always read the "engineered"
+    row, which understated wheat/pre_harvest's real error since that one
+    actually ships on "baseline"."""
     comparison = pd.read_csv("data/processed/feature_engineering_comparison.csv")
+    variant = best_variant(crop, checkpoint_name)
     row = comparison[(comparison["crop"] == crop) & (comparison["checkpoint"] == checkpoint_name) &
-                      (comparison["model"] == "GradientBoosting") & (comparison["variant"] == "engineered")]
+                      (comparison["model"] == "GradientBoosting") & (comparison["variant"] == variant)]
     return row["mean_mae"].iloc[0]
 
 
@@ -190,11 +195,11 @@ def predict(crop: str = "corn", as_of: date = None,
         print(f"Note: {as_of.year} Cropland Data Layer not yet published -- "
               f"using {cdl_year} CDL as the {crop} mask proxy.")
 
-    ndvi = fetch_current_ndvi(as_of.year, periods, CROPS[crop]["cdl_code"], cdl_year)
+    ndvi = fetch_current_ndvi(as_of.year, periods, CROPS[crop]["cdl_code"], cdl_year, crop_state_fips(crop))
     weather_moisture = weather_moisture_cache
     if weather_moisture is None:
         weather_moisture = fetch_current_weather_and_moisture(as_of.year, periods)
-    rotation = fetch_current_rotation(CROPS[crop]["cdl_code"], cdl_year)
+    rotation = fetch_current_rotation(CROPS[crop]["cdl_code"], cdl_year, crop_state_fips(crop))
 
     current = ndvi.merge(weather_moisture, on=["year", "state_fips", "county_fips", "county_name"], how="inner")
     current = current.merge(rotation, on=["state_fips", "county_fips"], how="inner")
@@ -209,16 +214,22 @@ def predict(crop: str = "corn", as_of: date = None,
     current["state_alpha"] = current["state_fips"].map(state_map)
     current = pd.get_dummies(current, columns=["state_alpha"], prefix="state")
 
-    # same transforms train_final_models.py applied: NDVI/weather anomalies
-    # (vs. each county's historical mean) and county-trend detrending
-    current = add_anomaly_features(current, aux["county_means"], aux["dynamic_features"])
-    current["year_trend"] = as_of.year - aux["min_year"]
+    # Apply the same transform train_final_models.py used for THIS crop --
+    # engineered (NDVI/weather anomalies + county-trend detrending) proved
+    # out for corn/soybean but hurt wheat's smaller dataset, so which one
+    # was actually used is data-driven per crop/checkpoint (see aux["variant"],
+    # written by train_final_models.py via feature_engineering.best_variant).
+    if aux["variant"] == "engineered":
+        current = add_anomaly_features(current, aux["county_means"], aux["dynamic_features"])
+        current["year_trend"] = as_of.year - aux["min_year"]
+        trend_pred = trend_predict(current, aux["trends"])
+    else:
+        trend_pred = 0.0
 
     for col in features:
         if col not in current.columns:
             current[col] = 0  # state dummy not present in this batch
 
-    trend_pred = trend_predict(current, aux["trends"])
     current["predicted_yield_bu_acre"] = model.predict(current[features]) + trend_pred
     current = add_historical_comparison(current, crop)
     current.insert(0, "crop", crop)

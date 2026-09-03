@@ -68,4 +68,44 @@ CROPS = {
         "price_label": "SOYBEANS - PRICE RECEIVED, MEASURED IN $ / BU",
         "cdl_code": 5,
     },
+    # Winter wheat specifically (yield_label/price_label both hand-verified
+    # against the live NASS API, cdl_code=24 verified against GEE's own CDL
+    # legend -- NASS also separately tracks Spring/Durum wheat, not what's
+    # grown in these states). No county-level NASS yield data exists for
+    # Iowa at all (0 counties, all years checked) -- wheat will only ever
+    # cover IL/NE/NC, not all 4 states, and that's a real data gap, not a
+    # bug. Also: winter wheat's actual season (fall-planted, harvested by
+    # early summer) doesn't line up with the Jun/Jul/Aug PERIODS/CHECKPOINTS
+    # below, which were built around corn/soybean's summer season -- by the
+    # "pre_harvest" checkpoint, wheat is likely already harvested in
+    # reality. Same category of known simplification as the NC calendar
+    # note above; a wheat-specific season calendar is a candidate follow-up,
+    # not done here.
+    "wheat": {
+        "display_name": "Wheat",
+        "nass_commodity": "WHEAT",
+        "yield_label": "WHEAT, WINTER - YIELD, MEASURED IN BU / ACRE",
+        "price_label": "WHEAT, WINTER - PRICE RECEIVED, MEASURED IN $ / BU",
+        "cdl_code": 24,
+        # Explicit subset -- see the comment above. Iowa is deliberately
+        # excluded, not just "happens to have no rows": without this, the
+        # live pipeline would still generate NDVI features for IA counties
+        # (CDL crop-masking doesn't care whether NASS publishes yield for a
+        # state) and run them through a model that never saw a single real
+        # IA wheat yield during training -- an untested extrapolation the
+        # confidence-tier system has no way to flag, so it's excluded
+        # upstream instead.
+        "states": ["IL", "NE", "NC"],
+    },
 }
+
+
+def crop_state_alphas(crop: str) -> list:
+    """State alpha codes this crop actually has data for -- STATE_ALPHAS
+    (all 4) unless the crop's CROPS entry narrows it (see "wheat" above)."""
+    return CROPS[crop].get("states", STATE_ALPHAS)
+
+
+def crop_state_fips(crop: str) -> list:
+    """FIPS codes for the states this crop actually has data for."""
+    return [STATES[a] for a in crop_state_alphas(crop)]

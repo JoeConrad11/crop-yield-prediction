@@ -8,7 +8,7 @@ import ee
 import pandas as pd
 from dotenv import load_dotenv
 
-from config import STATE_FIPS, YEAR_START, YEAR_END, PERIODS, CROPS
+from config import YEAR_START, YEAR_END, PERIODS, CROPS, crop_state_fips
 
 from gee_auth import ensure_initialized
 ensure_initialized()
@@ -74,7 +74,7 @@ if __name__ == "__main__":
         frames = []
         for period_name, (start_md, end_md) in PERIODS.items():
             print(f"Crop: {crop}, Period: {period_name} ({start_md} to {end_md})")
-            frames.append(fetch_period_ndvi(STATE_FIPS, YEAR_START, YEAR_END, period_name, start_md, end_md, cdl_code))
+            frames.append(fetch_period_ndvi(crop_state_fips(crop), YEAR_START, YEAR_END, period_name, start_md, end_md, cdl_code))
         df = pd.concat(frames, ignore_index=True)
         out_path = f"data/raw/gee_ndvi_{crop}_periods.csv"
         df.to_csv(out_path, index=False)

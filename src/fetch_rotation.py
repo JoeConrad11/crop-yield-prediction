@@ -13,7 +13,7 @@ rotation doesn't change within a growing season.
 """
 import pandas as pd
 
-from config import STATE_FIPS, YEAR_START, YEAR_END, CROPS
+from config import YEAR_START, YEAR_END, CROPS, crop_state_fips
 from fetch_gee import COUNTIES, CDL, crop_mask_for_year
 import ee
 
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     crops = sys.argv[1:] or list(CROPS.keys())
     for crop in crops:
         print(f"Crop: {crop}")
-        df = fetch_rotation_signal(STATE_FIPS, YEAR_START, YEAR_END, CROPS[crop]["cdl_code"])
+        df = fetch_rotation_signal(crop_state_fips(crop), YEAR_START, YEAR_END, CROPS[crop]["cdl_code"])
         out_path = f"data/raw/rotation_{crop}.csv"
         df.to_csv(out_path, index=False)
         print(f"Saved {len(df)} rows to {out_path}\n")

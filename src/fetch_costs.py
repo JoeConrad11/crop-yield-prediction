@@ -24,6 +24,7 @@ from config import CROPS, STATE_TO_ERS_REGION
 ERS_CSV_URLS = {
     "corn": "https://www.ers.usda.gov/media/4962/corn.csv",
     "soybeans": "https://www.ers.usda.gov/media/4976/soybeans.csv",
+    "wheat": "https://www.ers.usda.gov/media/4978/wheat.csv",
 }
 
 TOTAL_COST_ITEM = "Total, costs listed"

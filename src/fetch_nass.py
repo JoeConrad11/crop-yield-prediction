@@ -4,7 +4,7 @@ import requests
 import pandas as pd
 from dotenv import load_dotenv
 
-from config import STATE_ALPHAS, YEAR_START, YEAR_END, CROPS
+from config import YEAR_START, YEAR_END, CROPS, crop_state_alphas
 
 load_dotenv()
 
@@ -12,8 +12,22 @@ API_URL = "https://quickstats.nass.usda.gov/api/api_GET/"
 API_KEY = os.environ["NASS_API_KEY"]
 
 
+KEEP_COLS = [
+    "year", "state_alpha", "county_name", "county_code",
+    "commodity_desc", "short_desc", "Value", "unit_desc",
+]
+
+
 def fetch_county_yield(commodity: str, state_alpha: str, year_start: int, year_end: int) -> pd.DataFrame:
-    """Fetch annual county-level yield (units/acre) for a commodity and state."""
+    """Fetch annual county-level yield (units/acre) for a commodity and state.
+
+    Not every crop is grown enough in every state to have county-level NASS
+    survey data at all (e.g. wheat has zero rows for Iowa, every year
+    checked) -- NASS's API returns a 400 "bad request - invalid query" for
+    a genuinely empty result set, not a 200 with an empty list, so that
+    specific case is treated as "no data" and returns an empty frame rather
+    than crashing. Any other HTTP error still raises.
+    """
     params = {
         "key": API_KEY,
         "commodity_desc": commodity.upper(),
@@ -25,14 +39,13 @@ def fetch_county_yield(commodity: str, state_alpha: str, year_start: int, year_e
         "format": "JSON",
     }
     resp = requests.get(API_URL, params=params, timeout=60)
+    if resp.status_code == 400:
+        print(f"    (no NASS county-yield data for {commodity} in {state_alpha} -- treating as empty)")
+        return pd.DataFrame(columns=KEEP_COLS)
     resp.raise_for_status()
     data = resp.json()["data"]
     df = pd.DataFrame(data)
-    keep = [
-        "year", "state_alpha", "county_name", "county_code",
-        "commodity_desc", "short_desc", "Value", "unit_desc",
-    ]
-    df = df[[c for c in keep if c in df.columns]].copy()
+    df = df[[c for c in KEEP_COLS if c in df.columns]].copy()
     df["Value"] = pd.to_numeric(df["Value"].str.replace(",", ""), errors="coerce")
     return df.sort_values(["county_name", "year"]).reset_index(drop=True)
 
@@ -51,7 +64,7 @@ if __name__ == "__main__":
     crops = sys.argv[1:] or list(CROPS.keys())
     for crop in crops:
         print(f"Crop: {crop}")
-        df = fetch_multi_state_yield(commodity=CROPS[crop]["nass_commodity"], state_alphas=STATE_ALPHAS,
+        df = fetch_multi_state_yield(commodity=CROPS[crop]["nass_commodity"], state_alphas=crop_state_alphas(crop),
                                       year_start=YEAR_START, year_end=YEAR_END)
         out_path = f"data/raw/nass_{crop}_yield_multistate.csv"
         df.to_csv(out_path, index=False)

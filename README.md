@@ -7,9 +7,10 @@ insights into which crops will perform best in their area**, based on
 current-season conditions (satellite, weather, soil) combined with
 historical yield, price, and cost records.
 
-**Current stage: proof of concept at the county level.** Corn and soybeans,
-4 states (IA, IL, NE, NC), 2010–2023 historical + live current-season
-inference. **Long-term direction: scale toward more granular geography**
+**Current stage: proof of concept at the county level.** Corn, soybeans, and
+wheat, 4 states (IA, IL, NE, NC — wheat only covers IL/NE/NC, see "Known
+limitations"), 2010–2025 historical + live current-season inference.
+**Long-term direction: scale toward more granular geography**
 (ideally field/farm level, not just county) **and more crops**, while
 keeping the underlying pipeline honest about its limitations (regional cost
 approximations, no crop-rotation logic, MODIS/CDL resolution limits) as it
@@ -21,9 +22,11 @@ between where this is now and that goal.
 
 Working end-to-end pipeline: fetch → merge → model → live-predict → compare crops.
 
-- **Yield labels**: USDA NASS QuickStats, county-level, corn + soybeans.
+- **Yield labels**: USDA NASS QuickStats, county-level, corn + soybeans +
+  winter wheat (Iowa has zero county-level wheat yield data in any year
+  checked -- excluded from wheat entirely, not just missing predictions).
 - **NDVI**: MODIS (MOD13Q1), masked per-crop via the USDA Cropland Data
-  Layer (CDL code 1=corn, 5=soybeans), fetched per growing-season month
+  Layer (CDL code 1=corn, 5=soybeans, 24=winter wheat), fetched per growing-season month
   (Jun/Jul/Aug) so the model sees a trajectory, not one flat average.
 - **Weather**: PRISM (precip, tmin/tmax/tmean) via GEE `OREGONSTATE/PRISM/ANd`.
 - **Soil moisture**: ERA5-Land reanalysis (chosen over NASA SMAP, which has
@@ -36,7 +39,16 @@ Working end-to-end pipeline: fetch → merge → model → live-predict → comp
   `pre_harvest` (Jun+Jul+Aug, full season).
 - **Best results** (Gradient Boosting, pre-harvest, leave-one-year-out CV):
   corn MAE ≈13 bu/acre, R² ≈0.75; soybeans MAE ≈4 bu/acre, R² ≈0.80
-  (comparable ~8% relative error for both once yield scale is accounted for).
+  (comparable ~8% relative error for both once yield scale is accounted for);
+  wheat MAE ≈10 bu/acre, R² ≈0.14 -- meaningfully weaker, see "Known limitations".
+- **Feature approach is chosen per crop/checkpoint, not fixed**: engineered
+  features (county-trend detrending + NDVI/weather anomalies,
+  `feature_engineering.py`) proved out for corn/soybean and are used
+  everywhere for them, but actively hurt wheat/pre_harvest specifically
+  (median R² went negative vs. baseline's +0.14) -- not enough per-county
+  history in wheat's much smaller dataset to fit a reliable trend line. See
+  `feature_engineering.best_variant()`, which every training/prediction/
+  backtest script defers to rather than assuming engineered always wins.
 - **Live inference**: `predict_live.py` pulls the current, in-progress
   season's data (as much as has actually elapsed) and predicts with the
   checkpoint model that matches — a query in June only sees June, so it
@@ -76,7 +88,7 @@ crop-yield-prediction/
 │   ├── feature_engineering.py  # detrending + anomaly features, A/B vs baseline
 │   ├── train_final_models.py  # trains + persists production models
 │   ├── predict_live.py       # live in-season prediction, per crop
-│   └── compare_crops.py      # corn-vs-soybean profit comparison
+│   └── compare_crops.py      # per-county profit comparison across all CROPS
 └── references/         # papers, docs, data dictionaries
 ```
 
@@ -138,10 +150,16 @@ data) needs zero frontend/API changes.
   year actual yield from `model_table_<crop>_pre_harvest.csv`, for the trend
   chart), `GET /geo/counties` (static GeoJSON built once via
   `api/scripts/build_county_geojson.py`).
-- `frontend/`: a choropleth map (click a county to see its yield-history +
-  prediction trend chart, with a shaded confidence band), a searchable/
-  sortable county comparison list, zoom/pan, and a design system at
-  `frontend/design-system/crop-yield-predictor/MASTER.md`.
+- `frontend/`: a choropleth map (gray US-states backdrop, two-color gold-to-
+  green yield gradient, zoom/pan, keyboard-accessible) over a searchable/
+  sortable county comparison list. Click a county for a 4-tab dialog: yield
+  trend + confidence band, a SHAP-based "why this prediction" breakdown
+  (`api/routers/explain.py`, real per-instance feature attribution against
+  the exact row `predict_live.py` used, not global importance), model
+  accuracy (true held-out predicted-vs-actual across 2010-2025, not just the
+  live model's own claim), and a crop-comparison trend (each crop indexed to
+  its own county average, since raw bu/acre isn't comparable across crops).
+  Design system at `frontend/design-system/crop-yield-predictor/MASTER.md`.
 - Run locally: `.venv/bin/uvicorn api.main:app --port 8000` and
   `npm run dev --prefix frontend` (needs `frontend/.env.local` with
   `NEXT_PUBLIC_API_BASE_URL`, and `api/.env` with `SUPABASE_ANON_KEY` — see
@@ -168,6 +186,18 @@ data) needs zero frontend/API changes.
   PRICE PAID". That correction widened, not narrowed, the corn/soybean gap
   in one check — soybean prices have genuinely risen faster than corn's
   recently, a real market signal, not a pipeline artifact.
+- **Wheat is real but meaningfully weaker than corn/soybean**: only 41
+  counties total (vs. ~300 each for corn/soybean), and heavily NE-weighted
+  (341 of 364 training rows) since most IL/NC counties don't clear
+  `MIN_CROP_PIXELS` for wheat specifically even though NASS publishes
+  county-level wheat yield for them. R² tops out around 0.14 (pre_harvest)
+  vs. corn/soybean's usual 0.7-0.8, and year-to-year backtest R² swings wildly
+  (-2.9 to +0.6) for some counties. Also: winter wheat's real season
+  (fall-planted, harvested by early summer) doesn't line up with the
+  Jun/Jul/Aug PERIODS/CHECKPOINTS built for corn/soybean's summer season --
+  by the "pre_harvest" checkpoint, wheat is likely already harvested in
+  reality. A wheat-specific season calendar is a candidate follow-up, same
+  category as the NC calendar note above.
 - **2025 backtest anomaly**: the corn model backtested notably worse for
   2025 (R² ~0.57-0.59 vs. the usual ~0.68-0.75), and pre-harvest didn't
   outperform early-season as it normally should. 2025's weather/NDVI/soil-

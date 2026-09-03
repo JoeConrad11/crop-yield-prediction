@@ -110,6 +110,36 @@ def leave_one_year_out_eval_engineered(df: pd.DataFrame, base_features: list, mo
     return pd.DataFrame(results)
 
 
+def best_variant(crop: str, checkpoint_name: str) -> str:
+    """"engineered" or "baseline" for GradientBoosting (the production
+    model), from the saved comparison. Data-driven per crop/checkpoint, not
+    a hardcoded assumption -- but MAE alone isn't a safe tiebreaker on its
+    own: wheat/pre_harvest is a real case where engineered wins mean_mae by
+    ~1.6% while its median R^2 goes NEGATIVE (worse than always predicting
+    the mean) and baseline's stays positive (0.14) -- shipping "slightly
+    lower average error but not actually tracking the signal" over a
+    genuinely-working simpler alternative is the wrong call. corn/pre_harvest
+    has a similar-looking R^2 dip for engineered (0.746 vs 0.747) but it's
+    noise-level, both comfortably positive, so MAE should still decide there.
+    The rule: prefer lower mean_mae, UNLESS that would ship a
+    worse-than-useless (R^2 < 0) model while the other variant is genuinely
+    useful (R^2 >= 0) -- only then does R^2 override MAE.
+    """
+    comparison = pd.read_csv("data/processed/feature_engineering_comparison.csv")
+    rows = comparison[
+        (comparison["crop"] == crop) & (comparison["checkpoint"] == checkpoint_name)
+        & (comparison["model"] == "GradientBoosting")
+    ]
+    eng = rows[rows["variant"] == "engineered"].iloc[0]
+    base = rows[rows["variant"] == "baseline"].iloc[0]
+
+    if eng["median_r2"] < 0 and base["median_r2"] >= 0:
+        return "baseline"
+    if base["median_r2"] < 0 and eng["median_r2"] >= 0:
+        return "engineered"
+    return "engineered" if eng["mean_mae"] <= base["mean_mae"] else "baseline"
+
+
 def compare_baseline_vs_engineered(df: pd.DataFrame, checkpoint_name: str) -> pd.DataFrame:
     from model_utils import prep_features, leave_one_year_out_eval
 
@@ -152,5 +182,19 @@ if __name__ == "__main__":
             print(result.to_string(index=False))
 
     summary = pd.concat(all_rows, ignore_index=True)
-    summary.to_csv("data/processed/feature_engineering_comparison.csv", index=False)
-    print("\nSaved data/processed/feature_engineering_comparison.csv")
+
+    # Merge with any existing rows for crops NOT in this run, rather than
+    # overwriting -- a partial run (e.g. `feature_engineering.py wheat`)
+    # would otherwise silently wipe out corn/soybean's rows, which
+    # predict_live.py's load_confidence_mae() depends on for every crop,
+    # not just the one just re-run.
+    out_path = "data/processed/feature_engineering_comparison.csv"
+    try:
+        existing = pd.read_csv(out_path)
+        existing = existing[~existing["crop"].isin(crops)]
+        summary = pd.concat([existing, summary], ignore_index=True)
+    except FileNotFoundError:
+        pass
+
+    summary.to_csv(out_path, index=False)
+    print(f"\nSaved {out_path} ({sorted(summary['crop'].unique())})")

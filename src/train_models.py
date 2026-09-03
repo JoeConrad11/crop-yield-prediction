@@ -15,4 +15,18 @@ if __name__ == "__main__":
         print(f"\n=== {crop} ===")
         print(summary.to_string(index=False))
         frames.append(summary)
-    pd.concat(frames, ignore_index=True).to_csv("data/processed/model_comparison_summary.csv", index=False)
+    result = pd.concat(frames, ignore_index=True)
+
+    # Merge with existing rows for crops not in this run -- a partial run
+    # (e.g. `train_models.py wheat`) shouldn't silently drop other crops'
+    # rows from the saved comparison.
+    out_path = "data/processed/model_comparison_summary.csv"
+    try:
+        existing = pd.read_csv(out_path)
+        existing = existing[~existing["crop"].isin(crops)]
+        result = pd.concat([existing, result], ignore_index=True)
+    except FileNotFoundError:
+        pass
+
+    result.to_csv(out_path, index=False)
+    print(f"\nSaved {out_path} ({sorted(result['crop'].unique())})")

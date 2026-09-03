@@ -25,7 +25,7 @@ IMPORTANT LIMITATIONS (surfaced in the output, not just this docstring):
 """
 import pandas as pd
 
-from config import CROPS, STATES, STATE_TO_ERS_REGION
+from config import CROPS, STATES, STATE_TO_ERS_REGION, crop_state_alphas
 from predict_live import predict, completed_periods, pick_checkpoint, \
     fetch_current_weather_and_moisture, latest_available_cdl_year, CHECKPOINTS
 from fetch_prices import latest_price
@@ -77,7 +77,7 @@ def build_comparison(as_of: date = None, predictions: dict = None) -> pd.DataFra
     price_cache, cost_cache, ers_net_cache, ers_price_cache, basis_year_cache, escalation_cache = \
         {}, {}, {}, {}, {}, {}
     for crop in CROPS:
-        for state_alpha in STATE_TO_ERS_REGION:
+        for state_alpha in crop_state_alphas(crop):
             price_cache[(crop, state_alpha)] = latest_price(crop, state_alpha, as_of.year)
             cost_cache[(crop, state_alpha)] = latest_cost_per_acre(crop, state_alpha)
             ers_net_cache[(crop, state_alpha)] = ers_baseline_net_value(crop, state_alpha)
