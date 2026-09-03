@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+supabase
+pydantic
+python-dotenv
+pandas
+# geopandas is only needed to run scripts/build_county_geojson.py once --
+# not a runtime dependency of the API itself.
+geopandas

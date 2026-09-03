@@ -1,0 +1,9 @@
+earthengine-api
+geemap
+requests
+python-dotenv
+pandas
+numpy
+scikit-learn
+modal
+supabase

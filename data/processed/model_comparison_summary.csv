@@ -1,0 +1,17 @@
+crop,checkpoint,model,mean_mae,median_r2
+corn,early_season,LinearRegression,43.32426800357196,0.632763875044031
+corn,early_season,RandomForest,14.997729485986468,0.6821308800145629
+corn,early_season,GradientBoosting,15.467420180971208,0.6664310750199471
+corn,early_season,MLP (small NN),17.89928476394727,0.57028140363073
+corn,pre_harvest,LinearRegression,37.873533602511905,0.6815201719009878
+corn,pre_harvest,RandomForest,14.332705231753057,0.6934328633137897
+corn,pre_harvest,GradientBoosting,13.17761478353223,0.748065173446109
+corn,pre_harvest,MLP (small NN),15.771884244786971,0.6840045202475753
+soybeans,early_season,LinearRegression,16.440012311539668,0.6332681465964586
+soybeans,early_season,RandomForest,4.688225755956313,0.6971463312462522
+soybeans,early_season,GradientBoosting,4.81718532891612,0.686177533788423
+soybeans,early_season,MLP (small NN),5.913912065214952,0.6006177626947131
+soybeans,pre_harvest,LinearRegression,14.164590857035646,0.7201479249948128
+soybeans,pre_harvest,RandomForest,4.196364333970515,0.7303954199988212
+soybeans,pre_harvest,GradientBoosting,3.9045938904079582,0.7865276257142575
+soybeans,pre_harvest,MLP (small NN),4.8959595977774475,0.6863259017578018
