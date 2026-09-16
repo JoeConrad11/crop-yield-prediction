@@ -16,18 +16,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
-from api.routers import comparisons, crops, explain, geo, history, predictions  # noqa: E402
+from api.routers import (  # noqa: E402
+    comparisons, crops, explain, field_predict, field_stage, geo, history, predictions,
+)
 
 app = FastAPI(title="Crop Yield Prediction API")
 
 app.add_middleware(
     CORSMiddleware,
     # `next dev` picks whatever port is free (3000, 3001, ...) when the
-    # default is taken, so match any localhost/127.0.0.1 port in dev rather
-    # than hardcoding one. Tighten to the deployed frontend origin (drop the
-    # regex, set allow_origins to the real domain) before shipping.
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
-    allow_methods=["GET"],
+    # default is taken, so match any localhost/127.0.0.1 port in dev.
+    # Also match any *.vercel.app origin -- the deployed frontend gets a
+    # fresh per-deployment hash URL each time (frontend-<hash>-...) on top
+    # of its stable alias, so a single hardcoded origin isn't enough.
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+|https://.*\.vercel\.app",
+    # POST is only used by field_predict.router -- everything else here is
+    # still read-only GET.
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -37,6 +42,8 @@ app.include_router(comparisons.router)
 app.include_router(geo.router)
 app.include_router(history.router)
 app.include_router(explain.router)
+app.include_router(field_predict.router)
+app.include_router(field_stage.router)
 
 
 @app.get("/health")

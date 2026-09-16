@@ -18,6 +18,18 @@ moves from a research pipeline toward a real farmer-facing product. See
 "Known limitations / open questions" below for the specific gaps standing
 between where this is now and that goal.
 
+**North-star use case: a real product for real farmers**, not just a demo —
+an individual farmer creates an account, defines their own field(s), and
+gets predictions/recommendations scoped to their land rather than their
+county, with their own yield/cost history able to calibrate the numbers
+over time. See `ARCHITECTURE.md` for the phased plan (farm/field identity
+layer → field-level data pipeline → personalized prediction → delivery →
+production hardening) and the honest constraint driving it: USDA NASS yield
+labels — the model's ground truth — only exist at the county level, so
+"field-level" initially means field-level *input signal* through a
+county-calibrated model, not a field-level-trained model, until real
+farmers contribute their own yield history.
+
 ## Status
 
 Working end-to-end pipeline: fetch → merge → model → live-predict → compare crops.
@@ -94,6 +106,18 @@ crop-yield-prediction/
 
 `data/` and `.venv/` stay out of git — see `.gitignore`. Keep raw pulls
 immutable; all transforms happen on the way into `processed/`.
+
+## Related repos
+
+- **`ag-data-explorer`** (sibling directory, `../ag-data-explorer`) — "The
+  Harvest Ledger," a separate, publicly-deployed Next.js site that reads
+  this repo's historical output (via `scripts/seed.ts`, into its own
+  Supabase project) and presents it as a static, editorial "what actually
+  happened" record. No model, no prediction, no live backend — the opposite
+  concern from this repo. The main dashboard's "The Harvest Ledger" button
+  links out to it (`NEXT_PUBLIC_DATA_EXPLORER_URL` in `frontend/.env.local`,
+  defaults to its Vercel deployment). See `ARCHITECTURE.md` for how it fits
+  alongside the farmer-app direction.
 
 ## Environment
 

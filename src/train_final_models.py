@@ -19,16 +19,23 @@ import json
 import joblib
 from sklearn.ensemble import GradientBoostingRegressor
 
-from config import CHECKPOINTS, CROPS
+from config import CROPS, crop_checkpoints
 from model_utils import load_checkpoint_table, prep_features, numeric_feature_cols, TARGET
 from feature_engineering import fit_county_trends, trend_predict, county_feature_means, \
     add_anomaly_features, STATIC_COLS, best_variant
+from build_dataset import NEEDS_STRESS, stress_columns
 
 MODEL_DIR = "models"
 
 
 def train_and_save(crop: str, checkpoint_name: str):
     raw = load_checkpoint_table(checkpoint_name, crop)
+    if (crop, checkpoint_name) not in NEEDS_STRESS:
+        # Layer 2 stress columns are merged into every checkpoint table by
+        # build_dataset.py, but evaluate_stress_features.py's gate found
+        # they only genuinely help these two -- everywhere else, drop them
+        # before training so the shipped model matches what was validated.
+        raw = raw.drop(columns=stress_columns(raw))
     df, _ = prep_features(raw)  # one-hot encodes state, drops NaN rows
     base_numeric = numeric_feature_cols(raw)
     state_cols = [c for c in df.columns if c.startswith("state_")]
@@ -75,5 +82,5 @@ if __name__ == "__main__":
     import sys
     crops = sys.argv[1:] or list(CROPS.keys())
     for crop in crops:
-        for checkpoint_name in CHECKPOINTS:
+        for checkpoint_name in crop_checkpoints(crop):
             train_and_save(crop, checkpoint_name)

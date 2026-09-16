@@ -24,22 +24,25 @@ import pandas as pd
 from dotenv import load_dotenv
 import os
 
-from config import STATE_FIPS, PERIODS, CHECKPOINTS, CROPS, STATES, crop_state_fips
+from config import STATE_FIPS, CROPS, STATES, crop_state_fips, crop_periods, crop_checkpoints, all_periods
 from fetch_gee import fetch_period_ndvi
-from fetch_prism import fetch_period_weather
+from fetch_prism import fetch_period_weather, fetch_period_stress
 from fetch_soil_moisture import fetch_period_soil_moisture
 from fetch_rotation import fetch_rotation_signal
-from build_dataset import SOIL_COLS, TERRAIN_COLS, MIN_CROP_PIXELS
+from build_dataset import SOIL_COLS, TERRAIN_COLS, MIN_CROP_PIXELS, STRESS_METRICS, NEEDS_STRESS
 from feature_engineering import trend_predict, add_anomaly_features, best_variant
 
 from gee_auth import ensure_initialized
 ensure_initialized()
 
 
-def completed_periods(as_of: date) -> list:
-    """Which growing-season periods (jun/jul/aug) have fully elapsed as of this date."""
+def completed_periods(as_of: date, crop: str = "corn") -> list:
+    """Which of THIS crop's growing-season periods have fully elapsed as of
+    this date -- crop-specific since wheat's spring calendar (mar/apr/may)
+    completes on a different schedule than corn/soybean's summer one
+    (jun/jul/aug), see config.WHEAT_PERIODS."""
     done = []
-    for period_name, (start_md, end_md) in PERIODS.items():
+    for period_name, (start_md, end_md) in crop_periods(crop).items():
         end_month, end_day = map(int, end_md.split("-"))
         period_end = date(as_of.year, end_month, end_day)
         if as_of > period_end:
@@ -47,8 +50,8 @@ def completed_periods(as_of: date) -> list:
     return done
 
 
-def pick_checkpoint(done_periods: list) -> str:
-    for checkpoint_name, periods in sorted(CHECKPOINTS.items(), key=lambda kv: -len(kv[1])):
+def pick_checkpoint(done_periods: list, crop: str = "corn") -> str:
+    for checkpoint_name, periods in sorted(crop_checkpoints(crop).items(), key=lambda kv: -len(kv[1])):
         if set(periods).issubset(set(done_periods)):
             return checkpoint_name
     return None
@@ -61,10 +64,14 @@ def latest_available_cdl_year() -> int:
 
 
 def fetch_current_weather_and_moisture(current_year: int, periods: list) -> pd.DataFrame:
-    """Crop-agnostic -- fetched once regardless of how many crops are being predicted."""
+    """Crop-agnostic -- fetched once regardless of how many crops are being
+    predicted. `periods` should be the UNION of whatever periods every
+    requested crop's checkpoint needs (see all_periods() / __main__ below),
+    since corn/soybean and wheat now draw from different calendars."""
+    all_period_ranges = all_periods()
     weather_frames, moisture_frames = [], []
     for period_name in periods:
-        start_md, end_md = PERIODS[period_name]
+        start_md, end_md = all_period_ranges[period_name]
         weather_frames.append(fetch_period_weather(STATE_FIPS, current_year, current_year,
                                                      period_name, start_md, end_md))
         moisture_frames.append(fetch_period_soil_moisture(STATE_FIPS, current_year, current_year,
@@ -86,11 +93,35 @@ def fetch_current_weather_and_moisture(current_year: int, periods: list) -> pd.D
     return combined
 
 
-def fetch_current_ndvi(current_year: int, periods: list, cdl_code: int, cdl_year: int,
-                        state_fips_list: list = STATE_FIPS) -> pd.DataFrame:
+def fetch_current_stress(current_year: int, periods: list) -> pd.DataFrame:
+    """Same shape as fetch_current_weather_and_moisture, for the Layer 2
+    threshold stress metrics (see fetch_prism.fetch_period_stress). Only
+    fetch this for periods a NEEDS_STRESS checkpoint actually needs -- see
+    caller (run_pipeline.py / __main__ below) -- since most checkpoints
+    were trained without these columns and won't reference them."""
+    all_period_ranges = all_periods()
     frames = []
     for period_name in periods:
-        start_md, end_md = PERIODS[period_name]
+        start_md, end_md = all_period_ranges[period_name]
+        frames.append(fetch_period_stress(STATE_FIPS, current_year, current_year,
+                                           period_name, start_md, end_md))
+    stress = pd.concat(frames, ignore_index=True)
+
+    keys = ["year", "state_fips", "county_fips", "county_name"]
+    wide = stress.pivot(index=keys, columns="period", values=STRESS_METRICS)
+    wide.columns = [f"{metric}_{p}" for metric, p in wide.columns]
+    wide = wide.reset_index()
+    wide["state_fips"] = wide["state_fips"].astype(str).str.zfill(2)
+    wide["county_fips"] = wide["county_fips"].astype(str).str.zfill(3)
+    return wide
+
+
+def fetch_current_ndvi(current_year: int, periods: list, cdl_code: int, cdl_year: int,
+                        state_fips_list: list = STATE_FIPS) -> pd.DataFrame:
+    all_period_ranges = all_periods()
+    frames = []
+    for period_name in periods:
+        start_md, end_md = all_period_ranges[period_name]
         frames.append(fetch_period_ndvi(state_fips_list, current_year, current_year,
                                          period_name, start_md, end_md, cdl_code, cdl_year=cdl_year))
     ndvi = pd.concat(frames, ignore_index=True)
@@ -177,17 +208,18 @@ def add_historical_comparison(df: pd.DataFrame, crop: str) -> pd.DataFrame:
 
 
 def predict(crop: str = "corn", as_of: date = None,
-            weather_moisture_cache: pd.DataFrame = None, cdl_year: int = None) -> pd.DataFrame:
+            weather_moisture_cache: pd.DataFrame = None, cdl_year: int = None,
+            stress_cache: pd.DataFrame = None) -> pd.DataFrame:
     as_of = as_of or date.today()
-    done = completed_periods(as_of)
-    checkpoint_name = pick_checkpoint(done)
+    done = completed_periods(as_of, crop)
+    checkpoint_name = pick_checkpoint(done, crop)
 
     if checkpoint_name is None:
         print(f"As of {as_of}, only {done or 'no'} periods are complete -- "
               f"no checkpoint model covers this little of the season yet.")
         sys.exit(1)
 
-    periods = CHECKPOINTS[checkpoint_name]
+    periods = crop_checkpoints(crop)[checkpoint_name]
     print(f"[{crop}] As of {as_of}: periods {periods} complete -> using '{checkpoint_name}' model")
 
     cdl_year = cdl_year or latest_available_cdl_year()
@@ -204,6 +236,12 @@ def predict(crop: str = "corn", as_of: date = None,
     current = ndvi.merge(weather_moisture, on=["year", "state_fips", "county_fips", "county_name"], how="inner")
     current = current.merge(rotation, on=["state_fips", "county_fips"], how="inner")
     current = attach_static_features(current)
+
+    if (crop, checkpoint_name) in NEEDS_STRESS:
+        stress = stress_cache
+        if stress is None:
+            stress = fetch_current_stress(as_of.year, periods)
+        current = current.merge(stress, on=["year", "state_fips", "county_fips", "county_name"], how="inner")
 
     with open(f"models/gb_{crop}_{checkpoint_name}_features.json") as f:
         features = json.load(f)
@@ -268,11 +306,19 @@ if __name__ == "__main__":
     crops = sys.argv[1:] or list(CROPS.keys())
     as_of = date.today()
 
-    # weather/soil-moisture are crop-agnostic -- fetch once, reuse for every crop
-    done = completed_periods(as_of)
-    checkpoint_name = pick_checkpoint(done)
-    periods = CHECKPOINTS[checkpoint_name] if checkpoint_name else []
-    weather_moisture_cache = fetch_current_weather_and_moisture(as_of.year, periods) if periods else None
+    # weather/soil-moisture are crop-agnostic -- fetch once, reuse for every
+    # crop. But different crops can now have different season calendars
+    # (wheat's spring periods vs. corn/soybean's summer ones), so the cache
+    # has to cover the UNION of whatever periods each requested crop's own
+    # checkpoint actually needs, not one shared checkpoint's periods.
+    needed_periods = set()
+    for crop in crops:
+        done = completed_periods(as_of, crop)
+        checkpoint_name = pick_checkpoint(done, crop)
+        if checkpoint_name:
+            needed_periods.update(crop_checkpoints(crop)[checkpoint_name])
+    weather_moisture_cache = fetch_current_weather_and_moisture(as_of.year, sorted(needed_periods)) \
+        if needed_periods else None
     cdl_year = latest_available_cdl_year()
 
     results = []

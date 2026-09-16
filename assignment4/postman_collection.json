@@ -1,0 +1,154 @@
+{
+  "info": {
+    "name": "County Yield Anomaly Pipeline API",
+    "description": "Assignment 4 -- health, artifact info, valid predict (200), and invalid predict (422) against the live Modal deployment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://jconrad8--yield-anomaly-pipeline-api-fastapi-app.modal.run"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": ["{{base_url}}"],
+          "path": ["health"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Artifact is loaded', function () {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.status).to.eql('ok');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pipeline Info",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/info",
+          "host": ["{{base_url}}"],
+          "path": ["info"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Metadata describes a fitted pipeline', function () {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body.metadata.steps).to.eql(['anomaly', 'model']);",
+              "    pm.expect(body.metadata).to.have.property('sklearn_version');",
+              "    pm.expect(body.metadata).to.have.property('built_at');",
+              "    pm.expect(body.metadata.n_train_rows).to.be.above(0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Valid Predict (200)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"state_fips\": 19,\n  \"county_fips\": 169,\n  \"year\": 2024,\n  \"ndvi_jun\": 0.55,\n  \"ndvi_jul\": 0.78,\n  \"precip_sum_jun\": 110,\n  \"precip_sum_jul\": 95,\n  \"tmean_jun\": 21.5,\n  \"tmean_jul\": 24.0,\n  \"edd_29c_jul\": 15.0,\n  \"dry_days_jul\": 8,\n  \"soil_organic_carbon\": 25.0,\n  \"soil_ph\": 6.5,\n  \"elevation_m\": 320,\n  \"slope_deg\": 2.5\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/predict",
+          "host": ["{{base_url}}"],
+          "path": ["predict"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Returns a numeric yield prediction', function () {",
+              "    const body = pm.response.json();",
+              "    pm.expect(body).to.have.property('predicted_yield_bu_acre');",
+              "    pm.expect(body.predicted_yield_bu_acre).to.be.a('number');",
+              "    pm.expect(body).to.have.property('known_county');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invalid Predict (422)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"state_fips\": 19,\n  \"county_fips\": 169,\n  \"year\": 2024,\n  \"ndvi_jun\": 5.0,\n  \"ndvi_jul\": 0.78,\n  \"precip_sum_jun\": 110,\n  \"precip_sum_jul\": 95,\n  \"tmean_jun\": 21.5,\n  \"tmean_jul\": 24.0,\n  \"edd_29c_jul\": 15.0,\n  \"dry_days_jul\": 8,\n  \"soil_organic_carbon\": 25.0,\n  \"soil_ph\": 6.5,\n  \"elevation_m\": 320,\n  \"slope_deg\": 2.5\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/predict",
+          "host": ["{{base_url}}"],
+          "path": ["predict"]
+        },
+        "description": "ndvi_jun = 5.0 is out of the valid [0, 1] range -- Pydantic should reject this before it ever reaches the pipeline."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 422', function () {",
+              "    pm.response.to.have.status(422);",
+              "});",
+              "",
+              "pm.test('Error names the offending field', function () {",
+              "    const body = pm.response.json();",
+              "    const joined = JSON.stringify(body.detail);",
+              "    pm.expect(joined).to.include('ndvi_jun');",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

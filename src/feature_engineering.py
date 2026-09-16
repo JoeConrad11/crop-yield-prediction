@@ -17,7 +17,7 @@ import pandas as pd
 from sklearn.metrics import mean_absolute_error, r2_score
 
 from model_utils import ID_COLS, TARGET, numeric_feature_cols, MODELS
-from build_dataset import SOIL_COLS, TERRAIN_COLS
+from build_dataset import SOIL_COLS, TERRAIN_COLS, NEEDS_STRESS, stress_columns
 
 STATIC_COLS = SOIL_COLS + TERRAIN_COLS
 
@@ -167,14 +167,22 @@ def compare_baseline_vs_engineered(df: pd.DataFrame, checkpoint_name: str) -> pd
 
 if __name__ == "__main__":
     import sys
-    from config import CHECKPOINTS, CROPS
+    from config import CROPS, crop_checkpoints
     from model_utils import load_checkpoint_table
 
     crops = sys.argv[1:] or list(CROPS.keys())
     all_rows = []
     for crop in crops:
-        for checkpoint_name in CHECKPOINTS:
+        for checkpoint_name in crop_checkpoints(crop):
             df = load_checkpoint_table(checkpoint_name, crop)
+            if (crop, checkpoint_name) not in NEEDS_STRESS:
+                # Stress columns are merged into every checkpoint table by
+                # build_dataset.py, but only NEEDS_STRESS checkpoints are
+                # actually trained on them (see train_final_models.py) --
+                # this comparison must match, or best_variant()/
+                # load_confidence_mae() in predict_live.py would report
+                # accuracy for a feature set nothing actually ships with.
+                df = df.drop(columns=stress_columns(df))
             result = compare_baseline_vs_engineered(df, checkpoint_name)
             result.insert(0, "crop", crop)
             all_rows.append(result)

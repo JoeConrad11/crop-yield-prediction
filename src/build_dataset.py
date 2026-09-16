@@ -11,9 +11,11 @@ Weather, soil, terrain, and soil moisture are crop-agnostic (same physical
 county properties regardless of what's planted) and are fetched once, not
 per crop. Only yield labels and NDVI are crop-specific.
 """
+import os
+
 import pandas as pd
 
-from config import STATES, CHECKPOINTS, PERIODS, CROPS
+from config import STATES, CROPS, crop_checkpoints
 
 ID_COLS = ["year", "state_fips", "state_alpha", "county_fips", "county_name"]
 MIN_CROP_PIXELS = 500
@@ -49,6 +51,47 @@ def load_weather_wide() -> pd.DataFrame:
     keys = ["year", "state_fips", "county_fips"]
     wide = df.pivot(index=keys, columns="period", values=["precip_sum_mm", "tmean_c", "tmax_c", "tmin_c"])
     wide.columns = [f"{val.replace('_mm', '').replace('_c', '')}_{period}" for val, period in wide.columns]
+    return wide.reset_index()
+
+
+NEEDS_STRESS = {("corn", "early_season"), ("soybeans", "pre_harvest")}
+"""Which (crop, checkpoint) combos ship Layer 2 stress features. Decided by
+evaluate_stress_features.py's leave-one-year-out comparison: a real,
+non-noise improvement showed up only here; everywhere else it was a wash
+or (wheat, both checkpoints) actively worse or untrustworthy on wheat's
+tiny sample, consistent with the dormancy caveat in growth_stages.py.
+Read by train_final_models.py (which features to train on) AND the live
+fetchers (predict_live.py, fetch_field_features.py), which must fetch
+these columns for exactly the checkpoints trained on them -- never
+silently zero-fill a stress feature the model expects."""
+
+STRESS_METRICS = ["edd_29c", "gdd_10_30c", "days_above_30c", "days_above_35c",
+                   "dry_days", "heavy_rain_days"]
+
+
+def stress_columns(df: pd.DataFrame) -> list:
+    """Which of df's columns are Layer 2 stress features (any period).
+    Single shared definition -- evaluate_stress_features.py, train_final_models.py,
+    and feature_engineering.py all need to drop/keep the exact same set, and
+    a copy that drifts is how a checkpoint ends up trained on columns the
+    evaluation gate never actually tested."""
+    return [c for c in df.columns if any(c.startswith(m + "_") for m in STRESS_METRICS)]
+
+
+def load_stress_wide() -> pd.DataFrame:
+    """Agronomy Layer 2 threshold metrics (see fetch_prism.fetch_period_stress
+    and ARCHITECTURE.md). Optional: returns None when the file hasn't been
+    fetched, so the pipeline still builds without it and the before/after
+    comparison stays runnable in both directions."""
+    path = "data/raw/prism_stress_periods.csv"
+    if not os.path.exists(path):
+        return None
+    df = pd.read_csv(path)
+    df["state_fips"] = df["state_fips"].astype(str).str.zfill(2)
+    df["county_fips"] = df["county_fips"].astype(str).str.zfill(3)
+    keys = ["year", "state_fips", "county_fips"]
+    wide = df.pivot(index=keys, columns="period", values=STRESS_METRICS)
+    wide.columns = [f"{metric}_{period}" for metric, period in wide.columns]
     return wide.reset_index()
 
 
@@ -105,11 +148,17 @@ def build_full_table(crop: str) -> pd.DataFrame:
     merged = merged.merge(rotation_df, on=keys, how="inner")
     merged = merged.merge(soil_df, on=["state_fips", "county_fips"], how="inner")
     merged = merged.merge(terrain_df, on=["state_fips", "county_fips"], how="inner")
+
+    # Layer 2 stress metrics, merged only if they've been fetched -- keeps
+    # the table buildable (and the with/without comparison honest) either way.
+    stress_df = load_stress_wide()
+    if stress_df is not None:
+        merged = merged.merge(stress_df, on=keys, how="inner")
     return merged
 
 
-def build_checkpoint_table(full: pd.DataFrame, checkpoint_name: str) -> pd.DataFrame:
-    periods = CHECKPOINTS[checkpoint_name]
+def build_checkpoint_table(full: pd.DataFrame, checkpoint_name: str, crop: str) -> pd.DataFrame:
+    periods = crop_checkpoints(crop)[checkpoint_name]
     pixel_cols = [f"crop_pixels_{p}" for p in periods]
     feature_cols = (
         [f"ndvi_{p}" for p in periods]
@@ -122,6 +171,12 @@ def build_checkpoint_table(full: pd.DataFrame, checkpoint_name: str) -> pd.DataF
         + TERRAIN_COLS
         + ["pct_continuous"]
     )
+    # Layer 2 stress metrics, scoped to THIS checkpoint's periods like every
+    # other period feature above -- an early_season model must not see
+    # August heat that hasn't happened yet. Filtered against the table's
+    # actual columns so the build still works before the stress pull exists.
+    feature_cols += [c for c in (f"{metric}_{p}" for metric in STRESS_METRICS for p in periods)
+                      if c in full.columns]
     df = full[ID_COLS + ["yield_bu_acre"] + feature_cols + pixel_cols].copy()
     # every visible period must have enough crop-classified area for NDVI to be meaningful
     for col in pixel_cols:
@@ -134,8 +189,8 @@ if __name__ == "__main__":
     crops = sys.argv[1:] or list(CROPS.keys())
     for crop in crops:
         full = build_full_table(crop)
-        for checkpoint_name in CHECKPOINTS:
-            df = build_checkpoint_table(full, checkpoint_name)
+        for checkpoint_name in crop_checkpoints(crop):
+            df = build_checkpoint_table(full, checkpoint_name, crop)
             out_path = f"data/processed/model_table_{crop}_{checkpoint_name}.csv"
             df.to_csv(out_path, index=False)
             print(f"[{crop}/{checkpoint_name}] Saved {len(df)} rows, {df['county_name'].nunique()} counties, "

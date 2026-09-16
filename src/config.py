@@ -48,6 +48,27 @@ CHECKPOINTS = {
     "pre_harvest": ["jun", "jul", "aug"],  # full season, all periods visible
 }
 
+# Winter wheat's real season doesn't match corn/soybean's summer PERIODS
+# above -- it's fall-planted, overwinters, and is typically harvested by
+# early-mid summer in these states (NC ~mid-June, IL ~late June/early July,
+# NE ~July). By the time PERIODS' "aug" period completes, wheat has already
+# been harvested -- the model would be reading bare/stubble ground, not a
+# growing crop. Use wheat's actual spring growth window (green-up through
+# just before the earliest state's harvest) instead, so "pre_harvest" means
+# the same thing for wheat that it means for corn/soybean: the last
+# checkpoint before harvest starts. Same fixed-calendar-across-states
+# simplification as PERIODS above (a state-specific offset, e.g. for NC's
+# earlier harvest, is a further follow-up, not done here).
+WHEAT_PERIODS = {
+    "mar": ("03-01", "03-31"),
+    "apr": ("04-01", "04-30"),
+    "may": ("05-01", "05-31"),
+}
+WHEAT_CHECKPOINTS = {
+    "early_season": ["mar", "apr"],
+    "pre_harvest": ["mar", "apr", "may"],
+}
+
 # Crops supported by the pipeline. `cdl_code` is the USDA Cropland Data Layer
 # value used to mask NDVI to that crop's pixels; `yield_label` is the exact
 # NASS QuickStats short_desc string for county-level grain yield (verified
@@ -96,6 +117,8 @@ CROPS = {
         # confidence-tier system has no way to flag, so it's excluded
         # upstream instead.
         "states": ["IL", "NE", "NC"],
+        "periods": WHEAT_PERIODS,
+        "checkpoints": WHEAT_CHECKPOINTS,
     },
 }
 
@@ -109,3 +132,27 @@ def crop_state_alphas(crop: str) -> list:
 def crop_state_fips(crop: str) -> list:
     """FIPS codes for the states this crop actually has data for."""
     return [STATES[a] for a in crop_state_alphas(crop)]
+
+
+def crop_periods(crop: str) -> dict:
+    """This crop's growing-season monthly periods -- PERIODS (summer)
+    unless the crop's CROPS entry overrides it (wheat's spring calendar,
+    see WHEAT_PERIODS above)."""
+    return CROPS[crop].get("periods", PERIODS)
+
+
+def crop_checkpoints(crop: str) -> dict:
+    """This crop's season checkpoints -- CHECKPOINTS unless overridden (see crop_periods)."""
+    return CROPS[crop].get("checkpoints", CHECKPOINTS)
+
+
+def all_periods() -> dict:
+    """Union of every crop's periods, keyed by period name. Period names are
+    unique across crops (wheat's mar/apr/may vs. corn/soybean's jun/jul/aug
+    don't collide), so this merge is safe. Used by the crop-agnostic
+    weather/soil-moisture fetches, which need to cover whichever periods ANY
+    crop's calendar requires, not just one crop's."""
+    merged = {}
+    for crop in CROPS:
+        merged.update(crop_periods(crop))
+    return merged

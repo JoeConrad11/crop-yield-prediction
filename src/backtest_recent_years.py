@@ -23,7 +23,7 @@ import pandas as pd
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.metrics import mean_absolute_error, r2_score
 
-from config import CHECKPOINTS, CROPS, YEAR_START, YEAR_END
+from config import CROPS, YEAR_START, YEAR_END, crop_checkpoints
 from model_utils import load_checkpoint_table, prep_features, numeric_feature_cols, TARGET
 from feature_engineering import fit_county_trends, trend_predict, county_feature_means, \
     add_anomaly_features, STATIC_COLS, best_variant
@@ -91,7 +91,7 @@ if __name__ == "__main__":
     summary_rows = []
     per_county_frames = []
     for crop in CROPS:
-        for checkpoint_name in CHECKPOINTS:
+        for checkpoint_name in crop_checkpoints(crop):
             for test_year in BACKTEST_YEARS:
                 result, per_county = backtest_one(crop, checkpoint_name, test_year)
                 summary_rows.append(result)

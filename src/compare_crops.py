@@ -25,9 +25,9 @@ IMPORTANT LIMITATIONS (surfaced in the output, not just this docstring):
 """
 import pandas as pd
 
-from config import CROPS, STATES, STATE_TO_ERS_REGION, crop_state_alphas
+from config import CROPS, STATES, STATE_TO_ERS_REGION, crop_state_alphas, crop_checkpoints
 from predict_live import predict, completed_periods, pick_checkpoint, \
-    fetch_current_weather_and_moisture, latest_available_cdl_year, CHECKPOINTS
+    fetch_current_weather_and_moisture, latest_available_cdl_year
 from fetch_prices import latest_price
 from fetch_costs import latest_cost_per_acre, ers_baseline_net_value, ers_baseline_price, cost_basis_year
 from fetch_price_paid_index import escalation_ratio
@@ -53,18 +53,31 @@ def build_comparison(as_of: date = None, predictions: dict = None) -> pd.DataFra
     as_of = as_of or date.today()
 
     if predictions is None:
-        done = completed_periods(as_of)
-        checkpoint_name = pick_checkpoint(done)
-        periods = CHECKPOINTS[checkpoint_name] if checkpoint_name else []
-        weather_moisture_cache = fetch_current_weather_and_moisture(as_of.year, periods) if periods else None
+        # Each crop can be on a different checkpoint now (wheat's spring
+        # calendar vs. corn/soybean's summer one) -- e.g. in April wheat may
+        # already have an early_season checkpoint while corn/soybean have
+        # none yet. Only fetch/predict for crops that actually have one.
+        checkpoint_names = {}
+        needed_periods = set()
+        for crop in CROPS:
+            done = completed_periods(as_of, crop)
+            checkpoint_name = pick_checkpoint(done, crop)
+            checkpoint_names[crop] = checkpoint_name
+            if checkpoint_name:
+                needed_periods.update(crop_checkpoints(crop)[checkpoint_name])
+        weather_moisture_cache = fetch_current_weather_and_moisture(as_of.year, sorted(needed_periods)) \
+            if needed_periods else None
         cdl_year = latest_available_cdl_year()
-        predictions = {crop: predict(crop, as_of, weather_moisture_cache, cdl_year) for crop in CROPS}
+        predictions = {crop: predict(crop, as_of, weather_moisture_cache, cdl_year)
+                       for crop in CROPS if checkpoint_names[crop] is not None}
 
     # Long/tidy: one row per (crop, county), not one row per county with
     # per-crop column pairs -- lets this scale past 2 crops with no code
-    # change (see src/config.py CROPS).
+    # change (see src/config.py CROPS). Only crops actually present in
+    # `predictions` are compared -- a crop mid-way to its first checkpoint
+    # (see above) simply sits out of the comparison until it has one.
     frames = []
-    for crop in CROPS:
+    for crop in predictions:
         df = predictions[crop][["year", "state_fips", "county_fips", "county_name", "predicted_yield_bu_acre"]] \
             .rename(columns={"predicted_yield_bu_acre": "yield_bu_acre"}).copy()
         df["crop"] = crop

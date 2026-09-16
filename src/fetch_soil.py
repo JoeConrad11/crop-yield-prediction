@@ -52,6 +52,25 @@ def fetch_county_soil(state_fips_list: list) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def fetch_field_soil(geometry: ee.Geometry) -> dict:
+    """Same OpenLandMap layers as fetch_county_soil, reduced over a single
+    field polygon (reduceRegion) instead of every county (reduceRegions).
+    Static -- call once per field and cache the result, see
+    fetch_field_features.py."""
+    combined = None
+    for feature_name, asset_id in SOIL_LAYERS.items():
+        band = ee.Image(asset_id).select(0).rename(feature_name)
+        combined = band if combined is None else combined.addBands(band)
+
+    stats = combined.reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=geometry,
+        scale=250,
+        maxPixels=1e9,
+    ).getInfo()
+    return {name: stats.get(name) for name in SOIL_LAYERS}
+
+
 if __name__ == "__main__":
     df = fetch_county_soil(STATE_FIPS)
     out_path = "data/raw/soil_properties.csv"

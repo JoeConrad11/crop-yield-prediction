@@ -26,6 +26,67 @@ export interface PredictionOut {
   pct_vs_historical: number | null;
 }
 
+export interface FieldPrediction extends PredictionOut {
+  field_id: string | null;
+  // How much crop area actually backed the reading vs. how big the field
+  // is -- `coverage_tier` for a field is derived from these, not from the
+  // sensor-specific pixel count (see src/fetch_field_features.py).
+  crop_observed_acres: number | null;
+  field_acres: number | null;
+}
+
+// Agronomy Layer 1 (see ../../ARCHITECTURE.md). Available for ANY field
+// size -- it comes from 4km temperature data, so unlike the yield
+// prediction it has no small-field resolution limit.
+export interface GrowthStageMarker {
+  code: string;
+  description: string;
+  gdd_threshold: number;
+}
+
+export interface FieldGrowthStage {
+  crop: string;
+  planting_date: string;
+  as_of: string;
+  days_since_planting: number;
+  accumulated_gdd: number;
+  stage: GrowthStageMarker | null; // null before emergence
+  next_stage: GrowthStageMarker | null; // null past the last modelled stage
+  next_stage_gdd_away: number | null;
+  confidence: string;
+  caveat: string;
+}
+
+// Same-growth-stage year-over-year comparison -- the small-farm monitoring
+// product. Works at any field size (see ../../ARCHITECTURE.md).
+export interface FieldBenchmarkYear {
+  year: number;
+  equivalent_date: string | null; // null if that season never got this warm
+  ndvi: number | null;
+  pixels?: number;
+  window_days?: number;
+  note?: string;
+}
+
+export interface FieldStageBenchmark {
+  crop: string;
+  planting_date: string;
+  as_of: string;
+  stage: GrowthStageMarker | null;
+  accumulated_gdd: number;
+  current_ndvi: number | null;
+  current_pixels: number;
+  current_window_days: number;
+  history: FieldBenchmarkYear[];
+  history_mean_ndvi?: number;
+  history_sd_ndvi?: number;
+  pct_vs_history?: number;
+  sd_from_history?: number | null;
+  comparison_basis: string;
+  planting_assumption: string;
+  message?: string;
+}
+
 export interface CropProfitability {
   yield_bu_acre: number | null;
   price_per_bu: number | null;

@@ -7,6 +7,7 @@ import { useState } from "react";
 import { fetchCrops } from "@/lib/api-client";
 import { countyKey } from "@/lib/fips";
 
+import { AppHeader } from "./app-header";
 import { ComparisonTable } from "./comparison-table";
 import { CountyChoroplethMap } from "./county-choropleth-map";
 import { CountyDetailPanel } from "./county-detail-panel";
@@ -32,15 +33,9 @@ export function MapDashboard() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="flex flex-col gap-2 border-b border-border bg-card px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div>
-          <h1 className="font-heading text-lg font-semibold text-card-foreground">Crop Yield Predictor</h1>
-          <p className="text-xs text-muted-foreground">
-            County-level yield predictions &amp; profit comparisons -- click a county for its trend
-          </p>
-        </div>
+      <AppHeader subtitle="County-level yield predictions & profit comparisons -- click a county for its trend">
         <CropSelector selected={selectedCrop} />
-      </header>
+      </AppHeader>
 
       <main className="flex flex-1 flex-col lg:flex-row">
         <section className="min-h-[500px] flex-1 lg:h-[calc(100dvh-4.5rem)]" aria-label="Predicted yield map">

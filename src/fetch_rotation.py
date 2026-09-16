@@ -49,6 +49,35 @@ def fetch_rotation_signal(state_fips_list: list, year_start: int, year_end: int,
     return pd.DataFrame(rows)
 
 
+def fetch_field_rotation(geometry: ee.Geometry, year: int, cdl_code: int) -> dict:
+    """Same rotation signal as fetch_rotation_signal, reduced over a single
+    field polygon (reduceRegion) instead of every county (reduceRegions).
+    At field scale, `rotation_pixel_count` will often be very small (CDL is
+    30m/pixel, so at least a small field clears more pixels than MODIS
+    ever would) -- still worth keeping as a coverage signal, same reasoning
+    as fetch_period_ndvi_for_field's crop_pixel_count."""
+    this_year_mask = crop_mask_for_year(year, cdl_code)
+    prev_year_image = CDL.filter(ee.Filter.calendarRange(year - 1, year - 1, "year")).first()
+    was_same_crop_last_year = prev_year_image.select("cropland").eq(cdl_code)
+    continuous_indicator = was_same_crop_last_year.updateMask(this_year_mask).rename("continuous")
+
+    # reduceRegion band-prefixes combined-reducer keys even for a single
+    # band ("continuous_mean"/"continuous_count") -- unlike reduceRegions
+    # (the county path above), which doesn't. See fetch_period_ndvi_for_field
+    # in fetch_gee.py for how this was confirmed by hand.
+    stats = continuous_indicator.reduceRegion(
+        reducer=ee.Reducer.mean().combine(ee.Reducer.count(), sharedInputs=True),
+        geometry=geometry,
+        scale=250,
+        maxPixels=1e9,
+    ).getInfo()
+    return {
+        "year": year,
+        "pct_continuous": stats.get("continuous_mean"),
+        "rotation_pixel_count": stats.get("continuous_count"),
+    }
+
+
 if __name__ == "__main__":
     import sys
     crops = sys.argv[1:] or list(CROPS.keys())

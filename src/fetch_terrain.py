@@ -40,6 +40,24 @@ def fetch_county_terrain(state_fips_list: list) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def fetch_field_terrain(geometry: ee.Geometry) -> dict:
+    """Same SRTM elevation/slope as fetch_county_terrain, reduced over a
+    single field polygon (reduceRegion) instead of every county
+    (reduceRegions). Static -- call once per field and cache the result,
+    see fetch_field_features.py."""
+    dem = ee.Image("USGS/SRTMGL1_003").rename("elevation_m")
+    slope = ee.Terrain.slope(dem).rename("slope_deg")
+    combined = dem.addBands(slope)
+
+    stats = combined.reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=geometry,
+        scale=30,
+        maxPixels=1e9,
+    ).getInfo()
+    return {"elevation_m": stats.get("elevation_m"), "slope_deg": stats.get("slope_deg")}
+
+
 if __name__ == "__main__":
     df = fetch_county_terrain(STATE_FIPS)
     out_path = "data/raw/terrain_properties.csv"

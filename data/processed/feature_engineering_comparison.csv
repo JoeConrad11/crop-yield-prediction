@@ -1,37 +1,37 @@
 crop,checkpoint,model,variant,mean_mae,median_r2
-corn,early_season,RandomForest,baseline,15.664304914484934,0.6892942074114718
-corn,early_season,RandomForest,engineered,14.268281398298964,0.6995938516112677
-corn,early_season,GradientBoosting,baseline,15.86643644996315,0.6602606612966336
-corn,early_season,GradientBoosting,engineered,14.315483369712675,0.7213881504974142
-corn,early_season,MLP (small NN),baseline,17.56621139023985,0.6318022004614392
-corn,early_season,MLP (small NN),engineered,16.25240411466498,0.6837104029955574
+corn,early_season,RandomForest,baseline,15.633095319858313,0.682174579062843
+corn,early_season,RandomForest,engineered,14.309107944565213,0.6907257226455894
+corn,early_season,GradientBoosting,baseline,15.862400707045818,0.6952880772904357
+corn,early_season,GradientBoosting,engineered,14.12913756860598,0.7103710823064138
+corn,early_season,MLP (small NN),baseline,17.67303810043787,0.5945869965358138
+corn,early_season,MLP (small NN),engineered,14.188940833226557,0.7597225621414327
 corn,pre_harvest,RandomForest,baseline,14.907351386413294,0.7114611689884536
 corn,pre_harvest,RandomForest,engineered,13.759262125230979,0.7141613041592143
 corn,pre_harvest,GradientBoosting,baseline,13.83956388401203,0.7473690502057407
 corn,pre_harvest,GradientBoosting,engineered,13.663433864779797,0.7463430284363806
-corn,pre_harvest,MLP (small NN),baseline,15.662816013937045,0.6929768703360959
+corn,pre_harvest,MLP (small NN),baseline,15.662816013937043,0.6929768703360959
 corn,pre_harvest,MLP (small NN),engineered,13.164500797515672,0.7260854260735041
 soybeans,early_season,RandomForest,baseline,4.7852147337615865,0.6985255417132348
 soybeans,early_season,RandomForest,engineered,4.216241752528748,0.7304300913074544
 soybeans,early_season,GradientBoosting,baseline,4.84626425558346,0.698983618708543
 soybeans,early_season,GradientBoosting,engineered,4.252220749158983,0.7110500741419643
-soybeans,early_season,MLP (small NN),baseline,5.8823994561156185,0.6221659575207027
-soybeans,early_season,MLP (small NN),engineered,4.433001200676048,0.726494216333502
-soybeans,pre_harvest,RandomForest,baseline,4.245738744634885,0.7559858870093678
-soybeans,pre_harvest,RandomForest,engineered,3.6563281657693487,0.7961694331040853
-soybeans,pre_harvest,GradientBoosting,baseline,4.00112160727214,0.790723110028899
-soybeans,pre_harvest,GradientBoosting,engineered,3.6442813196624018,0.7977572269378754
-soybeans,pre_harvest,MLP (small NN),baseline,4.567195064448872,0.7297244909802498
-soybeans,pre_harvest,MLP (small NN),engineered,3.9104783446031757,0.7880995797795393
-wheat,early_season,RandomForest,baseline,9.810545366533198,-0.09251573438425953
-wheat,early_season,RandomForest,engineered,10.04169705124923,-0.20816644875292667
-wheat,early_season,GradientBoosting,baseline,10.817550190401692,-0.4252521376245213
-wheat,early_season,GradientBoosting,engineered,10.723110494696623,-0.2634749304642834
-wheat,early_season,MLP (small NN),baseline,9.726821373336909,-0.2749023129400878
-wheat,early_season,MLP (small NN),engineered,10.328641977929104,-0.15245134413153383
-wheat,pre_harvest,RandomForest,baseline,9.81073807867196,0.0816564390041975
-wheat,pre_harvest,RandomForest,engineered,9.534422347657198,-0.04351916807092704
-wheat,pre_harvest,GradientBoosting,baseline,10.033647351672197,0.14199599308437594
-wheat,pre_harvest,GradientBoosting,engineered,9.869190131891326,-0.15810485419995302
-wheat,pre_harvest,MLP (small NN),baseline,8.683959438439645,-0.3043767389123062
-wheat,pre_harvest,MLP (small NN),engineered,10.525141003099861,-0.4592515228547305
+soybeans,early_season,MLP (small NN),baseline,5.882399456115618,0.6221659575207026
+soybeans,early_season,MLP (small NN),engineered,4.433001200676047,0.726494216333502
+soybeans,pre_harvest,RandomForest,baseline,4.309787949392934,0.7556045159019904
+soybeans,pre_harvest,RandomForest,engineered,3.615904432081896,0.799999447547177
+soybeans,pre_harvest,GradientBoosting,baseline,4.022990413040784,0.7880970677847452
+soybeans,pre_harvest,GradientBoosting,engineered,3.506859656602725,0.8265489857681849
+soybeans,pre_harvest,MLP (small NN),baseline,5.53695515893175,0.687191772086675
+soybeans,pre_harvest,MLP (small NN),engineered,3.764115041484996,0.7980591779797643
+wheat,early_season,RandomForest,baseline,9.310757499746956,0.13502963656525202
+wheat,early_season,RandomForest,engineered,8.659649077102106,-0.004620443830378962
+wheat,early_season,GradientBoosting,baseline,9.581067639881537,0.1656279034957049
+wheat,early_season,GradientBoosting,engineered,9.11775016705785,-0.06003457137759738
+wheat,early_season,MLP (small NN),baseline,9.943020569616046,0.07573584795016985
+wheat,early_season,MLP (small NN),engineered,9.451177913037492,-0.13640806982687526
+wheat,pre_harvest,RandomForest,baseline,8.41943019569594,0.29105131571753495
+wheat,pre_harvest,RandomForest,engineered,8.263989322930936,0.13436591243689278
+wheat,pre_harvest,GradientBoosting,baseline,9.22585388365068,0.2631638439527515
+wheat,pre_harvest,GradientBoosting,engineered,9.447479855671777,-0.03462775129506057
+wheat,pre_harvest,MLP (small NN),baseline,10.07706615747069,-0.2327901465812321
+wheat,pre_harvest,MLP (small NN),engineered,10.343782179636746,-0.1584671626683276

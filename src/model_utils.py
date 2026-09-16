@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.metrics import mean_absolute_error, r2_score
 
-from config import CHECKPOINTS
+from config import crop_checkpoints
 
 ID_COLS = ["year", "state_fips", "state_alpha", "county_fips", "county_name"]
 TARGET = "yield_bu_acre"
@@ -59,7 +59,7 @@ def leave_one_year_out_eval(df: pd.DataFrame, features: list, model_factory) -> 
 def run_all_checkpoints(crop: str = "corn") -> pd.DataFrame:
     """Full model x checkpoint comparison grid, used by train_models.py and the notebook."""
     summary_rows = []
-    for checkpoint_name in CHECKPOINTS:
+    for checkpoint_name in crop_checkpoints(crop):
         raw = load_checkpoint_table(checkpoint_name, crop)
         df, features = prep_features(raw)
         for model_name, factory in MODELS.items():
