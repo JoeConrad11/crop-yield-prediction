@@ -18,17 +18,7 @@ moves from a research pipeline toward a real farmer-facing product. See
 "Known limitations / open questions" below for the specific gaps standing
 between where this is now and that goal.
 
-**North-star use case: a real product for real farmers**, not just a demo —
-an individual farmer creates an account, defines their own field(s), and
-gets predictions/recommendations scoped to their land rather than their
-county, with their own yield/cost history able to calibrate the numbers
-over time. See `ARCHITECTURE.md` for the phased plan (farm/field identity
-layer → field-level data pipeline → personalized prediction → delivery →
-production hardening) and the honest constraint driving it: USDA NASS yield
-labels — the model's ground truth — only exist at the county level, so
-"field-level" initially means field-level *input signal* through a
-county-calibrated model, not a field-level-trained model, until real
-farmers contribute their own yield history.
+
 
 ## Status
 
