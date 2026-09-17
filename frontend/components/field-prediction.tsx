@@ -8,6 +8,7 @@ import type { Field } from "@/lib/farm-types";
 import type { CropMeta, FieldPrediction as FieldPredictionResult } from "@/lib/types";
 import { FieldStage } from "./field-stage";
 import { FieldBenchmark } from "./field-benchmark";
+import { FieldAdvice } from "./field-advice";
 
 // Phase 3 of the farmer-app roadmap (see ../../ARCHITECTURE.md): apply the
 // county-calibrated model to THIS field's own satellite data instead of
@@ -168,6 +169,12 @@ export function FieldPredictionPanel({
           </p>
         </div>
       )}
+
+      {/* Layer 3 (see ../../ARCHITECTURE.md): pairs the number above with why
+          it came out that way. Rendered outside the status branches, same
+          reasoning as FieldStage -- its sourced-note half doesn't need a
+          successful prediction, only crop + planting date. */}
+      <FieldAdvice field={field} crop={crop} />
     </div>
   );
 }

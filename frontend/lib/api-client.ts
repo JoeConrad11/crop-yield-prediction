@@ -3,6 +3,7 @@ import type {
   CountyComparison,
   CountyGeoJSON,
   CropMeta,
+  FieldAdvice,
   FieldGrowthStage,
   FieldStageBenchmark,
   FieldPrediction,
@@ -188,4 +189,31 @@ export async function fetchFieldBenchmark(params: {
     );
   }
   return res.json() as Promise<FieldStageBenchmark>;
+}
+
+// Layer 3 (see ../../ARCHITECTURE.md): pairs this field's prediction with
+// why it came out that way. Unlike the other field endpoints, this one never
+// returns a limitation code -- a field the yield path can't score still gets
+// a 200 with shap_explanation: null, since "nothing to explain yet" isn't a
+// request failure (see api/routers/field_advice.py).
+export async function fetchFieldAdvice(params: {
+  boundary: GeoJSONPolygon;
+  crop: string;
+  plantingDate?: string | null;
+  fieldId?: string;
+}): Promise<FieldAdvice> {
+  const res = await fetch(`${API_BASE}/fields/advice`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      boundary: params.boundary,
+      crop: params.crop,
+      planting_date: params.plantingDate ?? null,
+      field_id: params.fieldId ?? null,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Advice failed: ${res.status} ${res.statusText}`);
+  }
+  return res.json() as Promise<FieldAdvice>;
 }

@@ -586,6 +586,47 @@ fabricated recommendation is worse than no recommendation.
 agronomic direction, not the minor convenience it looked like when Phase 4
 was first written.
 
+### BUILT (2026-09): Layer 3 shipped for exactly the checkpoints Layer 2 measured
+
+`src/field_advice.py` + `POST /fields/advice`, deliberately separate from
+`/fields/predict` (same reasoning as Layer 1's `/fields/stage`): the SHAP
+half needs a successful yield prediction, but the sourced-note half is keyed
+off growth stage alone, so a small field the yield path correctly refuses can
+still get a sourced note.
+
+- **SHAP half**: reuses the exact feature row and model `predict_field.py`
+  would use for this field (`predict_field.build_field_prediction_row()`,
+  split out of `predict_field()` for this reuse rather than re-deriving the
+  anomaly/trend/state-dummy steps a second time). The humanize/SHAP code
+  itself moved out of `api/routers/explain.py` into `src/explain_utils.py`
+  so the county and field explanations share one implementation instead of
+  two copies that can drift.
+- **Sourced-note half** (`src/advice_sources.py`): two citations, both
+  paraphrased from real ISU Extension publications (corn pollination
+  heat/drought sensitivity; soybean pod-set-through-seed-fill drought
+  sensitivity), each gated on the field's own computed stage AND its own
+  measured stress metrics actually being elevated -- not fired from stage
+  alone. **Deliberately scoped to exactly the two (crop, checkpoint) pairs
+  Layer 2 shipped stress features for** (`corn`/`early_season`,
+  `soybeans`/`pre_harvest`, see `build_dataset.NEEDS_STRESS`): every other
+  crop/checkpoint has no measured stress to condition on, so the honest
+  answer there is no note, not a hedged one. `edd_29c > 0` is not an
+  arbitrary cutoff (Schlenker & Roberts (2009) define that metric as
+  degree-days above the point their yield-response curve turns negative);
+  `dry_days >= 15` in a period IS a stated judgment call, same as the
+  pixel-fraction cutoffs in the coverage-tier work above.
+- Verified end to end: unit-tested `matching_notes()` against synthetic
+  stress rows (fires only on the right crop + stage + elevated stress
+  combination, confirmed silent otherwise), then live via `POST
+  /fields/advice` against the real `kjkj` field (109.7ac corn, R3/milk stage)
+  in the browser -- real SHAP contributions rendered under a real 192.4
+  bu/acre prediction, no sourced note (correct: corn/pre_harvest isn't a
+  NEEDS_STRESS checkpoint). `/predictions/explain` (county) re-verified
+  unchanged after the explain_utils.py extraction.
+- Built on a separate branch (`layer3-advice`) and verified only against a
+  local dev server; not deployed to Modal or Vercel, so the public app is
+  unaffected until a deploy is explicitly requested.
+
 ### Future (deferred, not in focus): the field calendar
 
 The natural product form of Layers 1-3: a per-field calendar marking when

@@ -132,6 +132,34 @@ export interface PredictionExplanation {
   other_feature_count: number;
 }
 
+// Layer 3 (see ../../ARCHITECTURE.md, "Layer 3 -- Advice, sourced not
+// invented"). shap_explanation is null when the yield path can't produce a
+// number for this field/season (see shap_unavailable_reason); sourced_notes
+// is an empty array whenever nothing measured warrants a citation, which is
+// the common case -- both are honest "nothing to say," not errors.
+export interface FieldAdviceExplanation {
+  base_value_bu_acre: number;
+  trend_contribution_bu_acre: number;
+  top_contributions: ExplainContribution[];
+  other_contribution_bu_acre: number;
+  other_feature_count: number;
+}
+
+export interface FieldAdviceNote {
+  id: string;
+  source_name: string;
+  source_url: string;
+  text: string;
+}
+
+export interface FieldAdvice {
+  crop: string;
+  stage: GrowthStageMarker | null;
+  shap_explanation: FieldAdviceExplanation | null;
+  shap_unavailable_reason: string | null;
+  sourced_notes: FieldAdviceNote[];
+}
+
 export interface CountyGeoJSON {
   type: "FeatureCollection";
   features: Array<{

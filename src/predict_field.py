@@ -41,13 +41,19 @@ CDL_CROP_NAMES = {
 }
 
 
-def predict_field(boundary: dict, crop: str, as_of: date = None, field_id: str = None) -> dict:
-    """Returns a dict shaped like one row of predict_live.predict()'s
-    output. Meant to sit directly behind an API endpoint a farmer hits by
-    clicking a button (see api/routers/field_predict.py) -- so failures
-    come back as {"error": "<code>", "message": ...} instead of raising or
-    sys.exit(1) the way the CLI-oriented predict_live.predict() does."""
-    as_of = as_of or date.today()
+def build_field_prediction_row(boundary: dict, crop: str, as_of: date, field_id: str = None) -> dict:
+    """Everything predict_field() needs before it can call model.predict():
+    the fetched feature row, the trained model + its expected feature list,
+    and the fully-engineered one-row dataframe aligned to those features.
+    Split out from predict_field() so field_advice.py's SHAP explanation can
+    reuse the exact same feature row and model a prediction would use,
+    without re-deriving the anomaly/trend/state-dummy steps a second time --
+    two independent copies of that logic is exactly how the reduceRegion key
+    and stress-column bugs elsewhere in this project happened.
+
+    Returns {"error": ..., "message": ...} on any of the same honest-refusal
+    conditions predict_field() has always returned, or on success a dict with
+    df, features, model, checkpoint_name, tier, and the raw fetched row."""
     row = fetch_field_features(boundary, crop, as_of, field_id=field_id)
     if row is None:
         return {
@@ -152,6 +158,33 @@ def predict_field(boundary: dict, crop: str, as_of: date = None, field_id: str =
             "cdl_year": row["cdl_year"],
             "cdl_composition": composition,
         }
+
+    return {
+        "df": df,
+        "features": features,
+        "model": model,
+        "trend_pred": trend_pred,
+        "checkpoint_name": checkpoint_name,
+        "tier": tier,
+        "row": row,
+    }
+
+
+def predict_field(boundary: dict, crop: str, as_of: date = None, field_id: str = None) -> dict:
+    """Returns a dict shaped like one row of predict_live.predict()'s
+    output. Meant to sit directly behind an API endpoint a farmer hits by
+    clicking a button (see api/routers/field_predict.py) -- so failures
+    come back as {"error": "<code>", "message": ...} instead of raising or
+    sys.exit(1) the way the CLI-oriented predict_live.predict() does."""
+    as_of = as_of or date.today()
+    built = build_field_prediction_row(boundary, crop, as_of, field_id=field_id)
+    if "error" in built:
+        return built
+
+    df, features, model = built["df"], built["features"], built["model"]
+    trend_pred, checkpoint_name, tier, row = (
+        built["trend_pred"], built["checkpoint_name"], built["tier"], built["row"]
+    )
 
     df["predicted_yield_bu_acre"] = model.predict(df[features]) + trend_pred
     df = add_historical_comparison(df, crop)
