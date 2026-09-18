@@ -4,7 +4,11 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import type { CalendarEntry } from "@/lib/types";
 
-export type DayItem = { entry: CalendarEntry; kind: "likely" | "window"; done: boolean };
+export type DayItem = {
+  entry: CalendarEntry;
+  kind: "likely" | "window";
+  done: boolean;
+};
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -15,7 +19,8 @@ export const isoDay = (d: Date) =>
 // missed; done items fade.
 function chipClass(item: DayItem): string {
   if (item.done) return "bg-muted text-muted-foreground line-through";
-  if (item.entry.status === "overdue") return "bg-destructive/15 text-destructive";
+  if (item.entry.status === "overdue")
+    return "bg-destructive/15 text-destructive";
   switch (item.entry.category) {
     case "health":
       return "bg-primary/15 text-primary";
@@ -51,7 +56,9 @@ export function CalendarGrid({
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const cells: (string | null)[] = [
     ...Array(first.getDay()).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => isoDay(new Date(year, month, i + 1))),
+    ...Array.from({ length: daysInMonth }, (_, i) =>
+      isoDay(new Date(year, month, i + 1)),
+    ),
   ];
   while (cells.length % 7) cells.push(null);
 
@@ -64,7 +71,10 @@ export function CalendarGrid({
     <div className="rounded-xl border border-accent/40 bg-card p-3 shadow-sm">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="font-heading text-base font-semibold text-card-foreground">
-          {first.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+          {first.toLocaleDateString(undefined, {
+            month: "long",
+            year: "numeric",
+          })}
         </h3>
         <div className="flex items-center gap-1">
           <button
@@ -99,12 +109,21 @@ export function CalendarGrid({
 
       <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border text-xs">
         {WEEKDAYS.map((w) => (
-          <div key={w} className="bg-muted/50 py-1 text-center font-medium text-muted-foreground">
+          <div
+            key={w}
+            className="bg-muted/50 py-1 text-center font-medium text-muted-foreground"
+          >
             {w}
           </div>
         ))}
         {cells.map((iso, i) => {
-          if (!iso) return <div key={`blank-${i}`} className="min-h-14 bg-card/60 sm:min-h-20" />;
+          if (!iso)
+            return (
+              <div
+                key={`blank-${i}`}
+                className="min-h-14 bg-card/60 sm:min-h-20"
+              />
+            );
           const items = itemsByDay[iso] ?? [];
           const likely = items.filter((x) => x.kind === "likely");
           const windowCount = items.length - likely.length;
@@ -121,7 +140,9 @@ export function CalendarGrid({
             >
               <span
                 className={`flex size-5 items-center justify-center self-end rounded-full text-[11px] ${
-                  isToday ? "bg-primary font-semibold text-primary-foreground" : "text-muted-foreground"
+                  isToday
+                    ? "bg-primary font-semibold text-primary-foreground"
+                    : "text-muted-foreground"
                 }`}
               >
                 {Number(iso.slice(8))}
@@ -146,17 +167,23 @@ export function CalendarGrid({
                 </span>
               )}
               {likely.length > 2 && (
-                <span className="hidden text-[10px] text-muted-foreground sm:block">+{likely.length - 2} more</span>
+                <span className="hidden text-[10px] text-muted-foreground sm:block">
+                  +{likely.length - 2} more
+                </span>
               )}
               {windowCount > 0 && !likely.length && (
-                <span className="size-1.5 self-start rounded-full bg-muted-foreground/40" aria-hidden="true" />
+                <span
+                  className="size-1.5 self-start rounded-full bg-muted-foreground/40"
+                  aria-hidden="true"
+                />
               )}
             </button>
           );
         })}
       </div>
       <p className="mt-2 text-[11px] text-muted-foreground/80">
-        Bold chips are the likely day; a grey dot marks other days inside a projected date range.
+        Bold chips are the likely day; a grey dot marks other days inside a
+        projected date range.
       </p>
     </div>
   );

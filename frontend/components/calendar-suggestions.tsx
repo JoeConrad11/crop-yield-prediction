@@ -22,8 +22,11 @@ export function CalendarSuggestions({
   hasAnything: boolean;
   onAddAnchor: (m: CalendarMissingAnchor, date: string) => Promise<void>;
 }) {
-  const actionableNotes = notes.filter((n) => n.code === "needs_planting_date" || n.code === "no_knowledge");
-  if (hasAnything && !missingAnchors.length && !actionableNotes.length) return null;
+  const actionableNotes = notes.filter(
+    (n) => n.code === "needs_planting_date" || n.code === "no_knowledge",
+  );
+  if (hasAnything && !missingAnchors.length && !actionableNotes.length)
+    return null;
 
   return (
     <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
@@ -33,15 +36,23 @@ export function CalendarSuggestions({
       </p>
       {!hasAnything && (
         <p className="text-sm text-muted-foreground">
-          Start by adding a field with its crop and planting date, or a group of livestock, below. The calendar fills
-          in from there -- each item comes with its source.
+          Start by adding a field with its crop and planting date, or a group of
+          livestock, below. The calendar fills in from there -- each item comes
+          with its source.
         </p>
       )}
       {missingAnchors.map((m) => (
-        <AnchorSuggestion key={`${m.subject_type}-${m.subject_id}-${m.anchor}`} missing={m} onAdd={onAddAnchor} />
+        <AnchorSuggestion
+          key={`${m.subject_type}-${m.subject_id}-${m.anchor}`}
+          missing={m}
+          onAdd={onAddAnchor}
+        />
       ))}
       {actionableNotes.map((n, i) => (
-        <p key={`${n.code}-${n.subject_id}-${i}`} className="text-sm text-muted-foreground">
+        <p
+          key={`${n.code}-${n.subject_id}-${i}`}
+          className="text-sm text-muted-foreground"
+        >
           {n.message}
         </p>
       ))}
@@ -61,7 +72,10 @@ function AnchorSuggestion({
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <span className="text-muted-foreground">
-        When&apos;s the <span className="font-medium text-foreground">{anchorLabel(missing.anchor).toLowerCase()}</span>{" "}
+        When&apos;s the{" "}
+        <span className="font-medium text-foreground">
+          {anchorLabel(missing.anchor).toLowerCase()}
+        </span>{" "}
         for {missing.subject_name ?? "this group"}?
       </span>
       <input

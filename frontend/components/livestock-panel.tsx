@@ -3,10 +3,16 @@
 import { useState } from "react";
 import { PawPrint, Trash2, X } from "lucide-react";
 
-import { addFarmEvent, createHerd, deleteFarmEvent, deleteHerd } from "@/lib/farm-client";
+import {
+  addFarmEvent,
+  createHerd,
+  deleteFarmEvent,
+  deleteHerd,
+} from "@/lib/farm-client";
 import type { FarmEvent, Herd } from "@/lib/farm-types";
 import type { CalendarKnowledge } from "@/lib/types";
 import { anchorLabel, formatDay, speciesLabel } from "@/lib/calendar-labels";
+import { SectionHeader } from "./section-header";
 
 const inputClass =
   "rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary";
@@ -45,7 +51,11 @@ export function LivestockPanel({
       await action();
       await onChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : (e as { message?: string })?.message ?? "Something went wrong");
+      setError(
+        e instanceof Error
+          ? e.message
+          : ((e as { message?: string })?.message ?? "Something went wrong"),
+      );
     } finally {
       setBusy(false);
     }
@@ -67,19 +77,22 @@ export function LivestockPanel({
   }
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="font-heading text-lg font-semibold text-foreground">Your livestock</h2>
-        {!adding && !!speciesOptions.length && (
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="cursor-pointer rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
-          >
-            Add livestock
-          </button>
-        )}
-      </div>
+    <section className="space-y-5">
+      <SectionHeader
+        title="Your livestock"
+        subtitle="Add your animals and key dates to get sourced schedules and reminders."
+        action={
+          !adding && !!speciesOptions.length ? (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="cursor-pointer rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+            >
+              Add livestock
+            </button>
+          ) : undefined
+        }
+      />
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -87,29 +100,46 @@ export function LivestockPanel({
         <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-accent/40 p-6 text-center">
           <PawPrint className="size-6 text-accent" aria-hidden="true" />
           <p className="text-sm text-muted-foreground">
-            Add cattle or sheep and the calendar will show what&apos;s due and when, with a source for each item.
+            Add cattle or sheep and the calendar will show what&apos;s due and
+            when, with a source for each item.
           </p>
         </div>
       )}
 
-      {herds.map((herd) => (
-        <HerdCard
-          key={herd.id}
-          herd={herd}
-          anchors={knowledge[herd.species]?.anchors ?? []}
-          events={events.filter((e) => e.subject_type === "herd" && e.subject_id === herd.id)}
-          busy={busy}
-          onDelete={() => run(() => deleteHerd(farmId, herd.id))}
-          onAddDate={(kind, date) =>
-            run(() => addFarmEvent({ farmId, subjectType: "herd", subjectId: herd.id, kind, eventDate: date }))
-          }
-          onDeleteDate={(eventId) => run(() => deleteFarmEvent(eventId))}
-        />
-      ))}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {herds.map((herd) => (
+          <HerdCard
+            key={herd.id}
+            herd={herd}
+            anchors={knowledge[herd.species]?.anchors ?? []}
+            events={events.filter(
+              (e) => e.subject_type === "herd" && e.subject_id === herd.id,
+            )}
+            busy={busy}
+            onDelete={() => run(() => deleteHerd(farmId, herd.id))}
+            onAddDate={(kind, date) =>
+              run(() =>
+                addFarmEvent({
+                  farmId,
+                  subjectType: "herd",
+                  subjectId: herd.id,
+                  kind,
+                  eventDate: date,
+                }),
+              )
+            }
+            onDeleteDate={(eventId) => run(() => deleteFarmEvent(eventId))}
+          />
+        ))}
+      </div>
 
       {adding && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-accent/40 bg-card p-4 shadow-sm">
-          <select value={species} onChange={(e) => setSpecies(e.target.value)} className={`${inputClass} cursor-pointer`}>
+          <select
+            value={species}
+            onChange={(e) => setSpecies(e.target.value)}
+            className={`${inputClass} cursor-pointer`}
+          >
             <option value="" disabled>
               Which animals?
             </option>
@@ -220,7 +250,11 @@ function HerdCard({
       )}
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <select value={kind} onChange={(e) => setKind(e.target.value)} className={`${inputClass} cursor-pointer py-1.5`}>
+        <select
+          value={kind}
+          onChange={(e) => setKind(e.target.value)}
+          className={`${inputClass} cursor-pointer py-1.5`}
+        >
           <option value="" disabled>
             Add a date...
           </option>
@@ -230,7 +264,12 @@ function HerdCard({
             </option>
           ))}
         </select>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${inputClass} py-1.5`} />
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className={`${inputClass} py-1.5`}
+        />
         <button
           type="button"
           disabled={!kind || !date || busy}
