@@ -1,3 +1,43 @@
 {
-  "rules": []
+  "rules": [
+    {
+      "id": "sheep_ewe_clostridial_prelambing",
+      "subject_kind": "sheep",
+      "category": "health",
+      "title": "Ewes: pre-lambing clostridial (CD&T) vaccination window",
+      "guidance": "Ewes are typically vaccinated 3 to 4 weeks before lambing so antibody levels peak when colostrum is produced, passing protection to the lambs. Enter the expected lambing date to see this window.",
+      "trigger": {"type": "offset", "anchor": "lambing_due", "days": -28, "window_days": 7},
+      "source_name": "South Dakota State University Extension",
+      "source_url": "https://extension.sdstate.edu/clostridial-disease-management-and-vaccines-sheep-and-goats",
+      "confidence": "good",
+      "caveat": "Some extension sources give a slightly wider 4 to 6 week window. Confirm the program and product with your veterinarian and follow the label.",
+      "vet_confirm": true
+    },
+    {
+      "id": "sheep_lamb_clostridial_first_dose",
+      "subject_kind": "sheep",
+      "category": "health",
+      "title": "Lambs: start clostridial (CD&T) vaccination series",
+      "guidance": "Lambs' first clostridial vaccination is commonly given somewhere between about 2 and 5 weeks of age depending on whether their mothers were vaccinated before lambing; a booster follows a few weeks later, and all vaccinations should be finished at least 2 weeks before weaning.",
+      "trigger": {"type": "offset", "anchor": "lambed", "days": 14, "window_days": 21},
+      "source_name": "Penn State Extension",
+      "source_url": "https://extension.psu.edu/weaning-practices-limit-stress-to-ewes-and-lambs",
+      "confidence": "approximate",
+      "caveat": "The right start age depends on the ewes' vaccination status, which this calendar does not know. Your veterinarian sets the actual schedule.",
+      "vet_confirm": true
+    },
+    {
+      "id": "sheep_lamb_weaning",
+      "subject_kind": "sheep",
+      "category": "husbandry",
+      "title": "Lambs: weaning (early-weaning system)",
+      "guidance": "In an early-weaning system lambs are weaned at roughly 60 days old and at least about 45 pounds, after being started on solid feed and water at least 2 weeks earlier. Lambs left with their mothers on pasture are naturally weaned much later, at around 4 to 6 months.",
+      "trigger": {"type": "offset", "anchor": "lambed", "days": 60},
+      "source_name": "Penn State Extension",
+      "source_url": "https://extension.psu.edu/weaning-practices-limit-stress-to-ewes-and-lambs",
+      "confidence": "approximate",
+      "caveat": "Weaning age depends on your production system and lamb weight, not the calendar alone.",
+      "vet_confirm": false
+    }
+  ]
 }

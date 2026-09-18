@@ -12,7 +12,10 @@ dosage text), and `load_rules()` raises rather than silently skipping a bad
 rule, so a bad entry can't quietly ship.
 
 Two trigger kinds:
-- "offset": anchor event + N days (animals, calendar-driven tasks). Handled
+- "offset": anchor event + N days (animals, calendar-driven tasks); N may be
+  negative for "N days BEFORE the anchor" (e.g. vaccinate ewes before an
+  expected lambing date), and an optional window_days widens the due date
+  into a range (sources publish "3 to 4 weeks", not a single day). Handled
   here.
 - "gdd": a crop growth stage from growth_stages.py, projected forward from
   heat accumulation. Loaded and validated here, but the projection needs
@@ -90,8 +93,11 @@ def validate_rule(rule: dict) -> list:
     elif ttype == "offset":
         if not trigger.get("anchor"):
             problems.append(f"{rid}: offset trigger needs 'anchor'")
-        if not isinstance(trigger.get("days"), int) or trigger["days"] < 0:
-            problems.append(f"{rid}: offset trigger needs integer 'days' >= 0")
+        if not isinstance(trigger.get("days"), int):
+            problems.append(f"{rid}: offset trigger needs integer 'days' (negative = before anchor)")
+        window = trigger.get("window_days")
+        if window is not None and (not isinstance(window, int) or window < 0):
+            problems.append(f"{rid}: 'window_days' must be an integer >= 0")
         repeat = trigger.get("repeat_every_days")
         if repeat is not None:
             if not isinstance(repeat, int) or repeat <= 0:
@@ -171,6 +177,7 @@ def plan_calendar(subjects: list, rules: list, today, completions=None) -> list:
             anchor = subject.get("anchors", {}).get(trigger["anchor"])
             if not anchor:
                 continue
+            window = timedelta(days=trigger.get("window_days", 0))
             for due in offset_occurrences(trigger, _to_date(anchor)):
                 key = (subject["subject_type"], str(subject["subject_id"]), rule["id"], due.isoformat())
                 entries.append({
@@ -182,7 +189,7 @@ def plan_calendar(subjects: list, rules: list, today, completions=None) -> list:
                     "category": rule["category"],
                     "due_from": due.isoformat(),
                     "due_likely": due.isoformat(),
-                    "due_to": due.isoformat(),
+                    "due_to": (due + window).isoformat(),
                     "status": status_for(due, today, key in done_keys),
                     "guidance": rule["guidance"],
                     "source_name": rule["source_name"],

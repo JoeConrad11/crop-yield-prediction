@@ -1,3 +1,69 @@
 {
-  "rules": []
+  "rules": [
+    {
+      "id": "cattle_prebreeding_vaccination",
+      "subject_kind": "cattle",
+      "category": "health",
+      "title": "Cows and heifers: pre-breeding vaccination window",
+      "guidance": "Vaccines for the breeding herd are typically given 30 to 60 days before breeding, so immunity has time to develop before the breeding season. Enter the planned breeding start date to see this window.",
+      "trigger": {"type": "offset", "anchor": "breeding_start", "days": -60, "window_days": 30},
+      "source_name": "University of Missouri Extension",
+      "source_url": "https://extension.missouri.edu/publications/g2044",
+      "confidence": "good",
+      "caveat": "Which vaccines are appropriate depends on your herd and region. Confirm the program with your veterinarian.",
+      "vet_confirm": true
+    },
+    {
+      "id": "cattle_pregnancy_exam",
+      "subject_kind": "cattle",
+      "category": "health",
+      "title": "Cows: pregnancy examination (review boosters with your vet)",
+      "guidance": "Pregnancy examination is commonly done around 4 to 5 months after breeding, and is a convenient time to handle cattle for any booster vaccine your veterinarian recommends.",
+      "trigger": {"type": "offset", "anchor": "breeding_start", "days": 120, "window_days": 30},
+      "source_name": "University of Missouri Extension",
+      "source_url": "https://extension.missouri.edu/publications/g2044",
+      "confidence": "approximate",
+      "caveat": "Timing is measured from when breeding began; your veterinarian decides the exam method and date.",
+      "vet_confirm": true
+    },
+    {
+      "id": "cattle_calf_preweaning_vaccination",
+      "subject_kind": "cattle",
+      "category": "health",
+      "title": "Calves: pre-weaning vaccination",
+      "guidance": "Vaccinating calves 3 to 4 weeks before weaning gives immunity time to develop before the stress of weaning; vaccinating on weaning day is an alternative. Enter the planned weaning date to see this window.",
+      "trigger": {"type": "offset", "anchor": "weaning_planned", "days": -28, "window_days": 7},
+      "source_name": "University of Missouri Extension",
+      "source_url": "https://extension.missouri.edu/publications/g2104",
+      "confidence": "good",
+      "caveat": "Confirm which vaccines and timing suit your calves with your veterinarian.",
+      "vet_confirm": true
+    },
+    {
+      "id": "cattle_new_arrival_surveillance",
+      "subject_kind": "cattle",
+      "category": "husbandry",
+      "title": "New arrivals: end of quarantine surveillance period",
+      "guidance": "Newly purchased cattle with an unknown history are generally kept separate and watched for 21 to 30 days before joining the herd.",
+      "trigger": {"type": "offset", "anchor": "purchased", "days": 21, "window_days": 9},
+      "source_name": "University of Missouri Extension",
+      "source_url": "https://extension.missouri.edu/publications/g2044",
+      "confidence": "good",
+      "caveat": "Your veterinarian may recommend testing or a longer period for your situation.",
+      "vet_confirm": false
+    },
+    {
+      "id": "cattle_breeding_season_end",
+      "subject_kind": "cattle",
+      "category": "breeding",
+      "title": "Target end of the breeding season",
+      "guidance": "A 60-day breeding season is associated with a 12-month calving interval, which is the usual goal for a cow herd.",
+      "trigger": {"type": "offset", "anchor": "breeding_start", "days": 60},
+      "source_name": "University of Missouri Extension",
+      "source_url": "https://extension.missouri.edu/publications/g2044",
+      "confidence": "approximate",
+      "caveat": "Some operations run longer seasons (commonly 70 to 90 days); this is a target, not a rule.",
+      "vet_confirm": false
+    }
+  ]
 }

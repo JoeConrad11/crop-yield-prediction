@@ -170,3 +170,43 @@ def test_missing_anchors_reports_what_to_ask_for():
         {"subject_type": "herd", "subject_id": 1, "subject_name": "Ewes", "anchor": "lambed"}
     ]
     assert fc.missing_anchors([flock(lambed="2026-08-01")], [rule]) == []
+
+
+# --- negative offsets and windows -----------------------------------------
+
+def test_negative_offset_is_before_anchor():
+    trig = {"type": "offset", "anchor": "lambing_due", "days": -28}
+    assert fc.offset_occurrences(trig, date(2026, 10, 29)) == [date(2026, 10, 1)]
+
+
+def test_window_days_widens_due_range():
+    trig = {"type": "offset", "anchor": "lambing_due", "days": -28, "window_days": 7}
+    rule = make_rule(trigger=trig)
+    e = fc.plan_calendar([flock(lambing_due="2026-10-29")], [rule], TODAY)[0]
+    assert (e["due_from"], e["due_likely"], e["due_to"]) == ("2026-10-01", "2026-10-01", "2026-10-08")
+
+
+def test_bad_window_rejected():
+    trig = {"type": "offset", "anchor": "lambed", "days": 5, "window_days": -1}
+    assert any("window_days" in p for p in fc.validate_rule(make_rule(trigger=trig)))
+
+
+# --- shipped knowledge, end to end ------------------------------------------
+
+def test_shipped_rules_plan_a_real_flock_and_herd():
+    rules = fc.load_rules()
+    subjects = [
+        {"subject_type": "herd", "subject_id": 1, "kind": "sheep", "name": "Ewes",
+         "anchors": {"lambing_due": "2027-03-01", "lambed": "2026-08-01"}},
+        {"subject_type": "herd", "subject_id": 2, "kind": "cattle", "name": "Cows",
+         "anchors": {"breeding_start": "2026-05-01"}},
+    ]
+    entries = fc.plan_calendar(subjects, rules, TODAY)
+    ids = {e["rule_id"] for e in entries}
+    assert {"sheep_ewe_clostridial_prelambing", "sheep_lamb_weaning",
+            "cattle_prebreeding_vaccination", "cattle_breeding_season_end"} <= ids
+    # health entries always ask for vet confirmation and carry a citation
+    for e in entries:
+        assert e["source_url"].startswith("https://")
+        if e["category"] == "health":
+            assert e["vet_confirm"] is True
