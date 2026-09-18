@@ -1,14 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { BookOpen, CalendarDays, Check, Stethoscope } from "lucide-react";
 
 import { fetchCalendarPlan } from "@/lib/api-client";
-import { setCompletion } from "@/lib/farm-client";
+import { addFarmEvent, setCompletion } from "@/lib/farm-client";
 import type { CalendarCompletion, FarmEvent, Field, Herd } from "@/lib/farm-types";
-import type { CalendarEntry, CalendarSubject } from "@/lib/types";
-import { anchorLabel, formatRange } from "@/lib/calendar-labels";
+import type { CalendarEntry, CalendarMissingAnchor, CalendarNote, CalendarSubject } from "@/lib/types";
+import { formatDay, formatRange } from "@/lib/calendar-labels";
+import { CalendarGrid, isoDay, type DayItem } from "./calendar-grid";
+import { CalendarSuggestions } from "./calendar-suggestions";
 
 const completionKey = (type: string, id: number, ruleId: string, date: string) => `${type}:${id}:${ruleId}:${date}`;
 
@@ -57,12 +59,23 @@ export function FarmCalendar({
     return [...cropFields, ...herdSubjects];
   }, [fields, herds, events]);
 
-  const { data: plan, isLoading, isError } = useQuery({
-    queryKey: ["calendar-plan", farmId, JSON.stringify(subjects)],
-    queryFn: () => fetchCalendarPlan(subjects),
-    enabled: subjects.length > 0,
-    staleTime: 10 * 60 * 1000,
+  // One request per field/herd (not one big request): livestock come back
+  // instantly and crop dates fill in as their Earth Engine projections
+  // finish, and each result is cached for the day.
+  const results = useQueries({
+    queries: subjects.map((subject) => ({
+      queryKey: ["calendar-plan", JSON.stringify(subject)],
+      queryFn: () => fetchCalendarPlan([subject]),
+      staleTime: 12 * 60 * 60 * 1000,
+      retry: 1,
+    })),
   });
+  const loadingCount = results.filter((r) => r.isLoading).length;
+  const anyError = results.some((r) => r.isError);
+  const plans = results.flatMap((r) => (r.data ? [r.data] : []));
+  const allEntries: CalendarEntry[] = plans.flatMap((p) => p.entries);
+  const missingAnchors: CalendarMissingAnchor[] = plans.flatMap((p) => p.missing_anchors);
+  const notes: CalendarNote[] = plans.flatMap((p) => p.notes);
 
   const doneKeys = useMemo(
     () => new Set(completions.map((c) => completionKey(c.subject_type, c.subject_id, c.rule_id, c.occurrence_date))),
@@ -89,17 +102,59 @@ export function FarmCalendar({
     }
   }
 
-  const entries = (plan?.entries ?? []).map((e) => ({
-    entry: e,
-    done: doneKeys.has(completionKey(e.subject_type, e.subject_id, e.rule_id, e.due_likely)),
-  }));
+  async function addAnchor(m: CalendarMissingAnchor, date: string) {
+    await addFarmEvent({
+      farmId,
+      subjectType: m.subject_type,
+      subjectId: m.subject_id,
+      kind: m.anchor,
+      eventDate: date,
+    });
+    await onChanged();
+  }
+
+  const today = useMemo(() => isoDay(new Date()), []);
+  const [view, setView] = useState(() => {
+    const t = new Date();
+    return { year: t.getFullYear(), month: t.getMonth() };
+  });
+  const [selected, setSelected] = useState(today);
+
+  const entries = allEntries
+    .map((e) => ({ entry: e, done: doneKeys.has(completionKey(e.subject_type, e.subject_id, e.rule_id, e.due_likely)) }))
+    .sort((a, b) => a.entry.due_likely.localeCompare(b.entry.due_likely));
+
+  // Each item sits on its likely day; other days inside its date range are
+  // marked as "window" so a projected range is visible on the grid.
+  const itemsByDay = useMemo(() => {
+    const map: Record<string, DayItem[]> = {};
+    const add = (iso: string, item: DayItem) => (map[iso] ??= []).push(item);
+    for (const { entry, done } of entries) {
+      add(entry.due_likely, { entry, kind: "likely", done });
+      const from = new Date(`${entry.due_from}T00:00:00`);
+      const to = new Date(`${entry.due_to}T00:00:00`);
+      for (let d = new Date(from), n = 0; d <= to && n < 31; d.setDate(d.getDate() + 1), n++) {
+        const iso = isoDay(d);
+        if (iso !== entry.due_likely) add(iso, { entry, kind: "window", done });
+      }
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allEntries.length, doneKeys]);
+
   const open = entries.filter((x) => !x.done).map((x) => x.entry);
-  const groups: { title: string; items: CalendarEntry[] }[] = [
+  const groups: { title: string; items: CalendarEntry[]; collapsed?: boolean }[] = [
     { title: "Overdue", items: open.filter((e) => e.status === "overdue") },
     { title: "Next 2 weeks", items: open.filter((e) => e.status === "due_soon") },
-    { title: "Later", items: open.filter((e) => e.status === "upcoming") },
+    { title: "Later", items: open.filter((e) => e.status === "upcoming"), collapsed: true },
   ];
   const doneItems = entries.filter((x) => x.done).map((x) => x.entry);
+  const selectedItems = itemsByDay[selected] ?? [];
+
+  const entryCard = (e: CalendarEntry, done: boolean) => {
+    const key = completionKey(e.subject_type, e.subject_id, e.rule_id, e.due_likely);
+    return <EntryCard key={key} entry={e} done={done} busy={busyKey === key} onToggle={(d) => toggle(e, d)} />;
+  };
 
   return (
     <section className="space-y-3">
@@ -108,35 +163,55 @@ export function FarmCalendar({
         Calendar
       </h2>
 
-      {!subjects.length && (
-        <p className="rounded-xl border border-dashed border-accent/40 p-6 text-center text-sm text-muted-foreground">
-          Add a field with a crop, or some livestock, and what&apos;s due will show up here.
+      <CalendarSuggestions
+        missingAnchors={missingAnchors}
+        notes={notes}
+        hasAnything={subjects.length > 0}
+        onAddAnchor={addAnchor}
+      />
+
+      {loadingCount > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Working out crop dates for {loadingCount} {loadingCount === 1 ? "field" : "fields"} -- this can take about
+          15 seconds the first time. Everything else is already shown.
         </p>
       )}
-      {isLoading && <p className="text-sm text-muted-foreground">Working out your calendar...</p>}
-      {isError && (
-        <p className="text-sm text-destructive">Couldn&apos;t build your calendar right now. Please try again shortly.</p>
+      {anyError && (
+        <p className="text-xs text-destructive">Some items couldn&apos;t be loaded right now. Please try again shortly.</p>
       )}
 
-      {plan?.missing_anchors.map((m) => (
-        <p key={`${m.subject_type}-${m.subject_id}-${m.anchor}`} className="text-xs text-muted-foreground">
-          Add <span className="font-medium text-foreground">{anchorLabel(m.anchor).toLowerCase()}</span> for{" "}
-          {m.subject_name ?? "this group"} to see the schedule items that depend on it.
-        </p>
-      ))}
-      {plan?.notes.map((n, i) => (
-        <p key={`${n.code}-${n.subject_id}-${i}`} className="text-xs text-muted-foreground">
-          {n.message}
-        </p>
-      ))}
+      <CalendarGrid
+        year={view.year}
+        month={view.month}
+        onMonthChange={(year, month) => setView({ year, month })}
+        itemsByDay={itemsByDay}
+        selected={selected}
+        onSelect={setSelected}
+        today={today}
+      />
 
-      {plan && !entries.length && !plan.missing_anchors.length && !!subjects.length && (
-        <p className="text-sm text-muted-foreground">Nothing scheduled yet.</p>
-      )}
+      <div className="space-y-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {selected === today ? "Today" : formatDay(selected, true)}
+        </h3>
+        {selectedItems.length ? (
+          <ul className="space-y-2">{selectedItems.map((x) => entryCard(x.entry, x.done))}</ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">Nothing scheduled for this day.</p>
+        )}
+      </div>
 
       {groups.map(
         (g) =>
-          !!g.items.length && (
+          !!g.items.length &&
+          (g.collapsed ? (
+            <details key={g.title}>
+              <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {g.title} ({g.items.length})
+              </summary>
+              <ul className="mt-2 space-y-2">{g.items.map((e) => entryCard(e, false))}</ul>
+            </details>
+          ) : (
             <div key={g.title} className="space-y-2">
               <h3
                 className={`text-xs font-semibold uppercase tracking-wide ${
@@ -145,37 +220,17 @@ export function FarmCalendar({
               >
                 {g.title}
               </h3>
-              <ul className="space-y-2">
-                {g.items.map((e) => (
-                  <EntryCard
-                    key={completionKey(e.subject_type, e.subject_id, e.rule_id, e.due_likely)}
-                    entry={e}
-                    done={false}
-                    busy={busyKey === completionKey(e.subject_type, e.subject_id, e.rule_id, e.due_likely)}
-                    onToggle={(d) => toggle(e, d)}
-                  />
-                ))}
-              </ul>
+              <ul className="space-y-2">{g.items.map((e) => entryCard(e, false))}</ul>
             </div>
-          )
+          ))
       )}
 
       {!!doneItems.length && (
-        <details className="space-y-2">
+        <details>
           <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Done ({doneItems.length})
           </summary>
-          <ul className="mt-2 space-y-2">
-            {doneItems.map((e) => (
-              <EntryCard
-                key={completionKey(e.subject_type, e.subject_id, e.rule_id, e.due_likely)}
-                entry={e}
-                done
-                busy={busyKey === completionKey(e.subject_type, e.subject_id, e.rule_id, e.due_likely)}
-                onToggle={(d) => toggle(e, d)}
-              />
-            ))}
-          </ul>
+          <ul className="mt-2 space-y-2">{doneItems.map((e) => entryCard(e, true))}</ul>
         </details>
       )}
     </section>

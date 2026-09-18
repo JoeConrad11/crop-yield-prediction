@@ -228,6 +228,17 @@ export function FarmDashboard() {
           </div>
         )}
 
+        {farm && fields && (
+          <FarmCalendar
+            farmId={farm.id}
+            fields={fields}
+            herds={herds ?? []}
+            events={farmEvents ?? []}
+            completions={completions ?? []}
+            onChanged={refreshCalendarData}
+          />
+        )}
+
         <div className="flex items-center justify-between">
           <h2 className="font-heading text-lg font-semibold text-foreground">Your fields</h2>
           {!adding && !farmErrored && (
@@ -375,16 +386,6 @@ export function FarmDashboard() {
           />
         )}
 
-        {farm && !herdsError && herds && fields && (
-          <FarmCalendar
-            farmId={farm.id}
-            fields={fields}
-            herds={herds}
-            events={farmEvents ?? []}
-            completions={completions ?? []}
-            onChanged={refreshCalendarData}
-          />
-        )}
       </main>
     </div>
   );

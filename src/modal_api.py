@@ -40,7 +40,7 @@ secrets = [
 ]
 
 
-@app.function(image=image, secrets=secrets, timeout=60)
+@app.function(image=image, secrets=secrets, timeout=120)
 @modal.asgi_app()
 def fastapi_app():
     import os

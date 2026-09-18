@@ -12,7 +12,16 @@ from fastapi.testclient import TestClient
 
 import calendar_service as cs
 
+import pytest
+
 TODAY = date(2026, 9, 18)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_projection_cache():
+    cs._PROJECTION_CACHE.clear()
+    yield
+    cs._PROJECTION_CACHE.clear()
 BOUNDARY = {"type": "Polygon", "coordinates": [[[0, 0], [0, 1], [1, 1], [0, 0]]]}
 
 
@@ -100,3 +109,34 @@ def test_route_rejects_unknown_subject_type():
 def test_route_knowledge():
     r = client().get("/calendar/knowledge")
     assert r.status_code == 200 and "cattle" in r.json()
+
+
+def test_projections_are_cached_and_errors_are_not():
+    cs._PROJECTION_CACHE.clear()
+    calls = []
+
+    def counting(boundary, crop, planting, as_of):
+        calls.append(1)
+        return fake_projector(boundary, crop, planting, as_of)
+
+    cs.build_plan([field()], as_of=TODAY, projector=counting)
+    cs.build_plan([field()], as_of=TODAY, projector=counting)
+    assert len(calls) == 1  # second plan served from cache
+
+    cs._PROJECTION_CACHE.clear()
+    flaky = []
+
+    def fails_once(*a):
+        flaky.append(1)
+        return {"error": "no_temperature_data", "message": "x"}
+
+    cs.build_plan([field()], as_of=TODAY, projector=fails_once)
+    cs.build_plan([field()], as_of=TODAY, projector=fails_once)
+    assert len(flaky) == 2  # errors retried, never cached
+
+
+def test_many_fields_all_get_projected():
+    cs._PROJECTION_CACHE.clear()
+    fields = [field(subject_id=i, planting_date=f"2026-05-{10 + i:02d}") for i in range(1, 6)]
+    plan = cs.build_plan(fields, as_of=TODAY, projector=fake_projector)
+    assert len(plan["entries"]) == 5 and plan["notes"] == []
