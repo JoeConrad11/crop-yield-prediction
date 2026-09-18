@@ -17,7 +17,8 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
 from api.routers import (  # noqa: E402
-    comparisons, crops, explain, field_advice, field_predict, field_stage, geo, history, predictions,
+    comparisons, crops, explain, farm_calendar, field_advice, field_predict, field_stage, geo, history,
+    predictions,
 )
 
 app = FastAPI(title="Crop Yield Prediction API")
@@ -45,6 +46,7 @@ app.include_router(explain.router)
 app.include_router(field_predict.router)
 app.include_router(field_stage.router)
 app.include_router(field_advice.router)
+app.include_router(farm_calendar.router)
 
 
 @app.get("/health")

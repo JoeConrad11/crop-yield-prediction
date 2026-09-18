@@ -8,15 +8,19 @@ Separate from modal_app.py (the weekly cron that WRITES predictions into
 Supabase) and assignment4/modal_serve.py (the Assignment 4 pipeline demo)
 -- three independent Modal apps, each doing one job.
 
-Deploy: modal deploy src/modal_api.py
+Deploy (production): modal deploy src/modal_api.py
+Deploy (dev copy, separate URL, leaves production untouched):
+    MODAL_API_APP_NAME=crop-yield-prediction-api-dev modal deploy src/modal_api.py
 """
+import os
 from pathlib import Path
 
 import modal
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-app = modal.App("crop-yield-prediction-api")
+# Overridable so a dev copy can be deployed without overwriting production.
+app = modal.App(os.environ.get("MODAL_API_APP_NAME", "crop-yield-prediction-api"))
 
 image = (
     modal.Image.debian_slim(python_version="3.12")

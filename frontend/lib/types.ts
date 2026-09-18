@@ -149,6 +149,7 @@ export interface FieldAdviceNote {
   id: string;
   source_name: string;
   source_url: string;
+  extra_sources?: { source_name: string; source_url: string }[];
   text: string;
 }
 

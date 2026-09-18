@@ -40,6 +40,13 @@ NOTES = [
         "periods": ("jun", "jul"),
         "source_name": "Iowa State University Extension and Outreach",
         "source_url": "https://crops.extension.iastate.edu/encyclopedia/corn-pollination-effect-high-temperature-and-stress",
+        # The heat/drought pollination mechanics are on the page above; the
+        # "up to nine percent per day" figure is only in this second ISU
+        # article, so it is cited here rather than attributed to the first.
+        "extra_sources": [{
+            "source_name": "Iowa State University Extension and Outreach (2017 drought article)",
+            "source_url": "https://crops.extension.iastate.edu/cropnews/2017/07/influence-drought-corn-and-soybean",
+        }],
         "text": (
             "Pollination is corn's single most heat- and drought-sensitive window: "
             "temperatures in the mid-90s(F) and above kill pollen viability, and "
@@ -99,6 +106,7 @@ def matching_notes(crop: str, stage_code: str, row: dict) -> list:
             "id": note["id"],
             "source_name": note["source_name"],
             "source_url": note["source_url"],
+            "extra_sources": note.get("extra_sources", []),
             "text": note["text"],
         })
     return matches

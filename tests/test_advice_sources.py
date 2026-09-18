@@ -67,3 +67,17 @@ def test_note_carries_source_citation():
     note = matching_notes("corn", "R1", {"edd_29c_jul": 1.0})[0]
     assert note["source_url"].startswith("https://crops.extension.iastate.edu/")
     assert note["source_name"] and note["text"]
+
+
+def test_corn_note_cites_the_page_that_has_the_per_day_figure():
+    """The 'nine percent per day' claim is only in the 2017 ISU drought
+    article, so the corn note must link it, not just the pollination page."""
+    note = matching_notes("corn", "R1", {"edd_29c_jul": 12.0})[0]
+    extra_urls = [e["source_url"] for e in note["extra_sources"]]
+    assert any(u.endswith("influence-drought-corn-and-soybean") for u in extra_urls)
+    assert note["source_url"].endswith("corn-pollination-effect-high-temperature-and-stress")
+
+
+def test_notes_without_extra_sources_return_empty_list():
+    note = matching_notes("soybeans", "R5", {"dry_days_jul": 20})[0]
+    assert note["extra_sources"] == []

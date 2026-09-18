@@ -72,6 +72,17 @@ export function FieldAdvice({ field, crop }: { field: Field; crop: string }) {
             >
               Source: {note.source_name}
             </a>
+            {note.extra_sources?.map((extra) => (
+              <a
+                key={extra.source_url}
+                href={extra.source_url}
+                target="_blank"
+                rel="noreferrer"
+                className="ml-2 mt-1 inline-block text-[11px] text-muted-foreground/80 underline decoration-dotted hover:text-muted-foreground"
+              >
+                Also: {extra.source_name}
+              </a>
+            ))}
           </div>
         </div>
       ))}
