@@ -1,3 +1,5 @@
+import type { GeoJSONPolygon } from "./geo";
+
 // Mirrors api/models.py -- not a separate source of truth. Crop identity is
 // always a free-form string (whatever's in src/config.py CROPS), never a
 // union of literal crop names, so a new crop needs no type change here.
@@ -178,4 +180,61 @@ export interface StateGeoJSON {
     properties: { state_fips: string; state_name: string };
     geometry: { type: string; coordinates: unknown };
   }>;
+}
+
+// POST /calendar/plan and GET /calendar/knowledge (api/routers/farm_calendar.py).
+// Every entry carries its citation; health items are vet-confirm reminders.
+export interface CalendarEntry {
+  subject_type: "field" | "herd";
+  subject_id: number;
+  subject_name: string | null;
+  rule_id: string;
+  title: string;
+  category: string;
+  due_from: string;
+  due_likely: string;
+  due_to: string;
+  status: "overdue" | "due_soon" | "upcoming" | "done";
+  guidance: string;
+  source_name: string;
+  source_url: string;
+  confidence: "good" | "approximate";
+  caveat: string | null;
+  vet_confirm: boolean;
+  // true when the date is projected from heat accumulation, not entered.
+  projected: boolean;
+}
+
+export interface CalendarMissingAnchor {
+  subject_type: "field" | "herd";
+  subject_id: number;
+  subject_name: string | null;
+  anchor: string;
+}
+
+export interface CalendarNote {
+  subject_id: number;
+  code: string;
+  message: string;
+}
+
+export interface CalendarPlan {
+  as_of: string;
+  entries: CalendarEntry[];
+  missing_anchors: CalendarMissingAnchor[];
+  notes: CalendarNote[];
+}
+
+export interface CalendarKnowledge {
+  [kind: string]: { anchors: string[]; rule_count: number; stage_rules: boolean };
+}
+
+export interface CalendarSubject {
+  subject_type: "field" | "herd";
+  subject_id: number;
+  kind: string;
+  name?: string | null;
+  anchors?: Record<string, string>;
+  boundary?: GeoJSONPolygon | null;
+  planting_date?: string | null;
 }

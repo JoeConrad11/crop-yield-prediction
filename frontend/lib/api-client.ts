@@ -1,5 +1,8 @@
 import type {
   BacktestPoint,
+  CalendarKnowledge,
+  CalendarPlan,
+  CalendarSubject,
   CountyComparison,
   CountyGeoJSON,
   CropMeta,
@@ -216,4 +219,23 @@ export async function fetchFieldAdvice(params: {
     throw new Error(`Advice failed: ${res.status} ${res.statusText}`);
   }
   return res.json() as Promise<FieldAdvice>;
+}
+
+export async function fetchCalendarKnowledge(): Promise<CalendarKnowledge> {
+  return getJSON<CalendarKnowledge>("/calendar/knowledge");
+}
+
+// Stateless: the farm's subjects go in, derived due dates come out. Done
+// ticks are applied client-side (see farm-calendar.tsx) so ticking an item
+// doesn't re-run the Earth Engine stage projections.
+export async function fetchCalendarPlan(subjects: CalendarSubject[]): Promise<CalendarPlan> {
+  const res = await fetch(`${API_BASE}/calendar/plan`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ subjects, completions: [] }),
+  });
+  if (!res.ok) {
+    throw new Error(`Calendar failed: ${res.status} ${res.statusText}`);
+  }
+  return res.json() as Promise<CalendarPlan>;
 }

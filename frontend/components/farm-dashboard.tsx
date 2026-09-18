@@ -8,11 +8,22 @@ import Link from "next/link";
 
 import { supabase } from "@/lib/supabase-client";
 import { useSession } from "@/lib/use-session";
-import { ensureDefaultFarm, fetchFields, createField, deleteField, updateFieldSeason } from "@/lib/farm-client";
-import { fetchCrops } from "@/lib/api-client";
+import {
+  ensureDefaultFarm,
+  fetchFields,
+  createField,
+  deleteField,
+  updateFieldSeason,
+  fetchHerds,
+  fetchFarmEvents,
+  fetchCompletions,
+} from "@/lib/farm-client";
+import { fetchCalendarKnowledge, fetchCrops } from "@/lib/api-client";
 import { polygonToGeoJSON, type LatLng } from "@/lib/geo";
 import { FieldMap } from "./field-map";
 import { FieldPredictionPanel } from "./field-prediction";
+import { LivestockPanel } from "./livestock-panel";
+import { FarmCalendar } from "./farm-calendar";
 
 // supabase-js errors (PostgrestError, AuthError, ...) aren't real Error
 // instances -- they're plain objects with a `.message` string -- so
@@ -64,6 +75,43 @@ export function FarmDashboard() {
   // map-dashboard.tsx already uses, so a new crop in src/config.py shows up
   // in both places with zero frontend changes.
   const { data: crops } = useQuery({ queryKey: ["crops"], queryFn: fetchCrops, staleTime: Infinity });
+
+  // Smart farm calendar inputs (src/supabase_farm_migration_calendar.sql).
+  // Kept separate from the field queries so a missing migration only turns
+  // off the livestock/calendar sections, never the fields the farmer already
+  // has.
+  const { data: herds, error: herdsError } = useQuery({
+    queryKey: ["herds", farm?.id],
+    queryFn: () => fetchHerds(farm!.id),
+    enabled: !!farm,
+    retry: false,
+  });
+  const { data: farmEvents } = useQuery({
+    queryKey: ["farm-events", farm?.id],
+    queryFn: () => fetchFarmEvents(farm!.id),
+    enabled: !!farm && !herdsError,
+    retry: false,
+  });
+  const { data: completions } = useQuery({
+    queryKey: ["calendar-completions", farm?.id],
+    queryFn: () => fetchCompletions(farm!.id),
+    enabled: !!farm && !herdsError,
+    retry: false,
+  });
+  const { data: calendarKnowledge } = useQuery({
+    queryKey: ["calendar-knowledge"],
+    queryFn: fetchCalendarKnowledge,
+    staleTime: Infinity,
+  });
+
+  async function refreshCalendarData() {
+    if (!farm) return;
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["herds", farm.id] }),
+      queryClient.invalidateQueries({ queryKey: ["farm-events", farm.id] }),
+      queryClient.invalidateQueries({ queryKey: ["calendar-completions", farm.id] }),
+    ]);
+  }
 
   const [adding, setAdding] = useState(false);
   const [draftPoints, setDraftPoints] = useState<LatLng[]>([]);
@@ -302,6 +350,40 @@ export function FarmDashboard() {
               </div>
             </div>
           </div>
+        )}
+
+        {farm && herdsError && (
+          <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+            <p className="font-medium">Livestock and calendar aren&apos;t set up yet.</p>
+            <p className="mt-1 text-destructive/80">
+              {farmErrorMessage(herdsError)} -- run{" "}
+              <code className="rounded bg-destructive/10 px-1 py-0.5">
+                src/supabase_farm_migration_calendar.sql
+              </code>{" "}
+              once in your Supabase project&apos;s SQL editor.
+            </p>
+          </div>
+        )}
+
+        {farm && !herdsError && herds && calendarKnowledge && (
+          <LivestockPanel
+            farmId={farm.id}
+            herds={herds}
+            events={farmEvents ?? []}
+            knowledge={calendarKnowledge}
+            onChanged={refreshCalendarData}
+          />
+        )}
+
+        {farm && !herdsError && herds && fields && (
+          <FarmCalendar
+            farmId={farm.id}
+            fields={fields}
+            herds={herds}
+            events={farmEvents ?? []}
+            completions={completions ?? []}
+            onChanged={refreshCalendarData}
+          />
         )}
       </main>
     </div>
