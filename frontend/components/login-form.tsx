@@ -7,14 +7,17 @@ import { Mail, MapPinned } from "lucide-react";
 import { supabase } from "@/lib/supabase-client";
 import { useSession } from "@/lib/use-session";
 
-// Magic-link only, deliberately -- no password to set, reset, or leak, and
-// Supabase's default email provider handles delivery with zero setup. A
-// dedicated password flow is a Phase 5 (production hardening) question,
-// not a Phase 1 one.
+// Magic-link by default -- no password to set, reset, or leak, and
+// Supabase's default email provider handles delivery with zero setup. The
+// password field is optional and exists for development: Supabase's built-in
+// sender is rate-limited to a few emails an hour, so a pre-created dev
+// account can sign in without one. A real password flow is still a Phase 5
+// (production hardening) question.
 export function LoginForm() {
   const router = useRouter();
   const { session, loading } = useSession();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -27,6 +30,16 @@ export function LoginForm() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setStatus("sending");
+    if (password) {
+      // On success useSession picks up the new session and the effect above
+      // redirects to /farm.
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setErrorMessage(error.message);
+        setStatus("error");
+      }
+      return;
+    }
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/farm` },
@@ -68,7 +81,7 @@ export function LoginForm() {
           <MapPinned className="size-5 text-primary" aria-hidden="true" />
         </div>
         <h1 className="font-heading text-xl font-semibold text-card-foreground">Sign in to My Farm</h1>
-        <p className="text-sm text-muted-foreground">We&apos;ll email you a link -- no password needed.</p>
+        <p className="text-sm text-muted-foreground">We&apos;ll email you a link, or enter a password if you have one.</p>
       </div>
       <input
         type="email"
@@ -79,13 +92,21 @@ export function LoginForm() {
         placeholder="you@farm.com"
         className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
       />
+      <input
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="Password (optional)"
+        autoComplete="current-password"
+        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+      />
       {status === "error" && <p className="text-sm text-destructive">{errorMessage}</p>}
       <button
         type="submit"
         disabled={status === "sending"}
         className="w-full cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-60"
       >
-        {status === "sending" ? "Sending..." : "Send sign-in link"}
+        {status === "sending" ? "Signing in..." : password ? "Sign in" : "Send sign-in link"}
       </button>
     </form>
   );
