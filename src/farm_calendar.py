@@ -18,9 +18,11 @@ Two trigger kinds:
   into a range (sources publish "3 to 4 weeks", not a single day). Handled
   here.
 - "gdd": a crop growth stage from growth_stages.py, projected forward from
-  heat accumulation. Loaded and validated here, but the projection needs
-  Earth Engine and lives with the crop path (field_insights.py), so
-  plan_calendar() skips gdd rules rather than guessing a date for them.
+  heat accumulation. The projection needs Earth Engine and lives in
+  stage_projection.py; the caller passes its result in as
+  subject["stage_projection"] ({stage_code: {from, likely, to}}). Without a
+  projection for that stage (no planting date, too little history, stage
+  already reached) plan_calendar() emits nothing rather than guessing.
 
 Missing anchors never produce a guessed date; missing_anchors() reports what
 the farmer still needs to enter so the UI can ask for it.
@@ -107,6 +109,13 @@ def validate_rule(rule: dict) -> list:
     elif ttype == "gdd":
         if not trigger.get("stage"):
             problems.append(f"{rid}: gdd trigger needs 'stage'")
+        else:
+            from growth_stages import stage_model
+            model = stage_model(rule["subject_kind"])
+            if model is None:
+                problems.append(f"{rid}: no growth-stage model for '{rule['subject_kind']}'")
+            elif trigger["stage"] not in {code for _, code, _ in model["stages"]}:
+                problems.append(f"{rid}: '{trigger['stage']}' is not a stage in the {rule['subject_kind']} model")
     return problems
 
 
@@ -156,9 +165,40 @@ def status_for(due: date, today: date, done: bool) -> str:
     return "upcoming"
 
 
+def _entry(subject, rule, due_from, due_likely, due_to, status, **extra):
+    return {
+        "subject_type": subject["subject_type"],
+        "subject_id": subject["subject_id"],
+        "subject_name": subject.get("name"),
+        "rule_id": rule["id"],
+        "title": rule["title"],
+        "category": rule["category"],
+        "due_from": due_from,
+        "due_likely": due_likely,
+        "due_to": due_to,
+        "status": status,
+        "guidance": rule["guidance"],
+        "source_name": rule["source_name"],
+        "source_url": rule["source_url"],
+        "confidence": rule["confidence"],
+        "caveat": rule.get("caveat"),
+        "vet_confirm": rule["vet_confirm"],
+        **extra,
+    }
+
+
+def _gdd_entry(subject, rule, today, done_keys):
+    window = (subject.get("stage_projection") or {}).get(rule["trigger"]["stage"])
+    if not window or not window.get("likely"):
+        return None
+    key = (subject["subject_type"], str(subject["subject_id"]), rule["id"], window["likely"])
+    status = status_for(_to_date(window["likely"]), today, key in done_keys)
+    return _entry(subject, rule, window["from"], window["likely"], window["to"], status, projected=True)
+
+
 def plan_calendar(subjects: list, rules: list, today, completions=None) -> list:
     """Calendar entries, sorted by date, for every offset rule whose anchor
-    the subject has.
+    the subject has, plus every gdd rule the subject has a projected window for.
 
     `subjects`: [{"subject_type": "herd"|"field", "subject_id": ..., "kind":
     "cattle"|"sheep"|"corn"..., "name": str, "anchors": {anchor_kind:
@@ -172,7 +212,12 @@ def plan_calendar(subjects: list, rules: list, today, completions=None) -> list:
     for subject in subjects:
         for rule in rules:
             trigger = rule["trigger"]
-            if trigger["type"] != "offset" or rule["subject_kind"] != subject["kind"]:
+            if rule["subject_kind"] != subject["kind"]:
+                continue
+            if trigger["type"] == "gdd":
+                entry = _gdd_entry(subject, rule, today, done_keys)
+                if entry:
+                    entries.append(entry)
                 continue
             anchor = subject.get("anchors", {}).get(trigger["anchor"])
             if not anchor:
@@ -180,24 +225,10 @@ def plan_calendar(subjects: list, rules: list, today, completions=None) -> list:
             window = timedelta(days=trigger.get("window_days", 0))
             for due in offset_occurrences(trigger, _to_date(anchor)):
                 key = (subject["subject_type"], str(subject["subject_id"]), rule["id"], due.isoformat())
-                entries.append({
-                    "subject_type": subject["subject_type"],
-                    "subject_id": subject["subject_id"],
-                    "subject_name": subject.get("name"),
-                    "rule_id": rule["id"],
-                    "title": rule["title"],
-                    "category": rule["category"],
-                    "due_from": due.isoformat(),
-                    "due_likely": due.isoformat(),
-                    "due_to": (due + window).isoformat(),
-                    "status": status_for(due, today, key in done_keys),
-                    "guidance": rule["guidance"],
-                    "source_name": rule["source_name"],
-                    "source_url": rule["source_url"],
-                    "confidence": rule["confidence"],
-                    "caveat": rule.get("caveat"),
-                    "vet_confirm": rule["vet_confirm"],
-                })
+                entries.append(_entry(
+                    subject, rule, due.isoformat(), due.isoformat(), (due + window).isoformat(),
+                    status_for(due, today, key in done_keys), projected=False,
+                ))
     entries.sort(key=lambda e: (e["due_likely"], e["title"]))
     return entries
 

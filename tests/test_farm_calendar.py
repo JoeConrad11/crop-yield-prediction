@@ -210,3 +210,56 @@ def test_shipped_rules_plan_a_real_flock_and_herd():
         assert e["source_url"].startswith("https://")
         if e["category"] == "health":
             assert e["vet_confirm"] is True
+
+
+# --- gdd (crop stage) rules --------------------------------------------------
+
+def corn_rule(stage="R1", **kw):
+    fields = dict(id="corn_r1", subject_kind="corn", category="crop_stage",
+                  trigger={"type": "gdd", "stage": stage})
+    fields.update(kw)
+    return make_rule(**fields)
+
+
+def corn_field(projection):
+    return {"subject_type": "field", "subject_id": 7, "kind": "corn", "name": "North 40",
+            "anchors": {}, "stage_projection": projection}
+
+
+def test_gdd_rule_uses_projected_window():
+    proj = {"R1": {"from": "2026-09-25", "likely": "2026-09-28", "to": "2026-10-02"}}
+    e = fc.plan_calendar([corn_field(proj)], [corn_rule()], TODAY)[0]
+    assert (e["due_from"], e["due_likely"], e["due_to"]) == ("2026-09-25", "2026-09-28", "2026-10-02")
+    assert e["projected"] is True and e["status"] == "due_soon"
+
+
+def test_gdd_rule_silent_without_projection_or_window():
+    assert fc.plan_calendar([corn_field(None)], [corn_rule()], TODAY) == []
+    assert fc.plan_calendar([corn_field({})], [corn_rule()], TODAY) == []
+    refused = {"R1": {"from": None, "likely": None, "to": None}}
+    assert fc.plan_calendar([corn_field(refused)], [corn_rule()], TODAY) == []
+
+
+def test_gdd_completion_marks_done():
+    proj = {"R1": {"from": "2026-09-25", "likely": "2026-09-28", "to": "2026-10-02"}}
+    done = [("field", 7, "corn_r1", "2026-09-28")]
+    e = fc.plan_calendar([corn_field(proj)], [corn_rule()], TODAY, completions=done)[0]
+    assert e["status"] == "done"
+
+
+def test_gdd_stage_must_exist_in_growth_model():
+    assert any("not a stage" in p for p in fc.validate_rule(corn_rule(stage="R99")))
+    wheat = corn_rule(subject_kind="wheat")
+    assert any("no growth-stage model" in p for p in fc.validate_rule(wheat))
+
+
+def test_gdd_rules_dont_appear_as_missing_anchors():
+    assert fc.missing_anchors([corn_field({})], [corn_rule()]) == []
+
+
+def test_shipped_crop_rules_project_for_a_corn_and_soy_field():
+    rules = fc.load_rules()
+    corn = corn_field({"R1": {"from": "2026-10-01", "likely": "2026-10-03", "to": "2026-10-06"},
+                       "R6": {"from": "2026-11-01", "likely": "2026-11-05", "to": "2026-11-09"}})
+    ids = {e["rule_id"] for e in fc.plan_calendar([corn], rules, TODAY)}
+    assert ids == {"corn_silking_pollination", "corn_physiological_maturity"}

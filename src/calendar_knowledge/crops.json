@@ -1,3 +1,56 @@
 {
-  "rules": []
+  "rules": [
+    {
+      "id": "corn_silking_pollination",
+      "subject_kind": "corn",
+      "category": "crop_stage",
+      "title": "Corn: silking and pollination window",
+      "guidance": "Silking (R1) begins when silks become visible outside the husks, and pollination occurs soon after. Pollen is no longer viable once temperatures reach the mid 90s F or higher, especially in low humidity, and drought stress slows silk elongation while speeding pollen shed, so pollen can be shed before silks emerge. This is the stage to check on field moisture and heat.",
+      "trigger": {"type": "gdd", "stage": "R1"},
+      "source_name": "Iowa State University Extension; University of Minnesota Extension",
+      "source_url": "https://crops.extension.iastate.edu/encyclopedia/corn-pollination-effect-high-temperature-and-stress",
+      "confidence": "good",
+      "caveat": "Projected from accumulated heat and past seasons; GDU-to-stage varies with hybrid maturity rating, so treat the window as approximate unless you know your hybrid.",
+      "vet_confirm": false
+    },
+    {
+      "id": "corn_physiological_maturity",
+      "subject_kind": "corn",
+      "category": "harvest",
+      "title": "Corn: physiological maturity (black layer)",
+      "guidance": "R6, physiological maturity or black layer, occurs about 55 to 65 days after silking. Kernel dry weight is usually at its maximum and kernels are safe from frost. Grain still needs to dry down before harvest.",
+      "trigger": {"type": "gdd", "stage": "R6"},
+      "source_name": "University of Minnesota Extension",
+      "source_url": "https://extension.umn.edu/growing-corn/growth-and-development",
+      "confidence": "good",
+      "caveat": "Projected from accumulated heat and past seasons; hybrid maturity rating shifts this date. Harvest timing also depends on grain moisture, not just stage.",
+      "vet_confirm": false
+    },
+    {
+      "id": "soybean_beginning_seed",
+      "subject_kind": "soybeans",
+      "category": "crop_stage",
+      "title": "Soybeans: approaching beginning seed (R5)",
+      "guidance": "R5 is reached when seed is about 1/8 inch (3 mm) long in the pod at one of the four uppermost nodes on the main stem. Check the top nodes as this window approaches.",
+      "trigger": {"type": "gdd", "stage": "R5"},
+      "source_name": "Iowa State University Extension",
+      "source_url": "https://crops.extension.iastate.edu/encyclopedia/soybean-growth-stages",
+      "confidence": "approximate",
+      "caveat": "Soybean development is driven substantially by day length, not just heat, and varies by maturity group, so heat-based staging is rough orientation, not a scouting schedule.",
+      "vet_confirm": false
+    },
+    {
+      "id": "soybean_beginning_maturity",
+      "subject_kind": "soybeans",
+      "category": "harvest",
+      "title": "Soybeans: approaching beginning maturity (R7)",
+      "guidance": "R7 is reached when one normal pod on the main stem has reached its mature pod color. Check pods as this window approaches.",
+      "trigger": {"type": "gdd", "stage": "R7"},
+      "source_name": "Iowa State University Extension",
+      "source_url": "https://crops.extension.iastate.edu/encyclopedia/soybean-growth-stages",
+      "confidence": "approximate",
+      "caveat": "Soybean development is driven substantially by day length, not just heat, and varies by maturity group, so heat-based staging is rough orientation, not a scouting schedule.",
+      "vet_confirm": false
+    }
+  ]
 }
